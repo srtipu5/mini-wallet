@@ -33,10 +33,10 @@ func Validation(message string) *Error { return NewError(CodeValidation, message
 
 // Predefined errors used by the services.
 var (
-	ErrWalletNotFound       = NewError(CodeWalletNotFound, "wallet not found")
-	ErrSameWalletTransfer   = NewError(CodeSameWalletTransfer, "cannot transfer to the same wallet")
-	ErrInsufficientBalance  = NewError(CodeInsufficientBalance, "insufficient balance")
-	ErrDuplicateGatewayRef  = NewError(CodeDuplicateGatewayRef, "this gateway_ref has already been used")
+	ErrWalletNotFound       = NewError(CodeWalletNotFound, "Wallet not found")
+	ErrSameWalletTransfer   = NewError(CodeSameWalletTransfer, "Cannot transfer to the same wallet")
+	ErrInsufficientBalance  = NewError(CodeInsufficientBalance, "Wallet does not have enough balance for this transfer")
+	ErrDuplicateGatewayRef  = NewError(CodeDuplicateGatewayRef, "The gateway_ref has already been used")
 	ErrIdempotencyKeyReused = NewError(CodeIdempotencyKeyReused, "Idempotency-Key was already used with a different request body")
 )
 
