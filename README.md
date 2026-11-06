@@ -244,18 +244,10 @@ the `message` is a sentence for people (capital first letter, full stop at the e
 
 ## Run the tests
 
-**Option A: everything in Docker (no Go needed)**
+**Everything in Docker (no Go needed)**
 
 ```bash
 docker compose --profile test run --rm tests
-```
-
-**Option B: with Go 1.25 installed locally**
-
-```bash
-docker compose up -d db
-TEST_DATABASE_URL="postgres://wallet:wallet@localhost:5432/wallet_test?sslmode=disable" \
-  go test -race -count=1 ./...
 ```
 
 All tests live in `tests/`, split by kind:
