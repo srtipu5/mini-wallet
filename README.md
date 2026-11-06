@@ -6,22 +6,50 @@ transfers, and view transaction history. It is written in Go with PostgreSQL.
 ## Run it
 
 ```bash
-docker compose up --build
+make up          # or: docker compose up --build
 ```
 
 The API runs on **http://localhost:8080**. Postgres starts first, and migrations
 run automatically when the API starts. To use other host ports, set them first:
-`API_PORT=9090 DB_PORT=5433 docker compose up --build`.
+`API_PORT=9090 DB_PORT=5433 make up`.
+
+## Make commands
+
+The [`Makefile`](Makefile) wraps the common Docker and Go commands. Run `make` on
+its own to list them all.
+
+| Command | What it does |
+|---|---|
+| `make up` | Build and start the API and Postgres in the foreground (`docker compose up --build`) |
+| `make up-d` | Same as `make up`, but in the background |
+| `make down` | Stop and remove the containers. The database data is kept |
+| `make restart` | Run `make down`, then `make up-d` |
+| `make logs` | Follow the API logs |
+| `make ps` | Show container status |
+| `make db` | Start only Postgres, in the background |
+| `make test` | Run the full test suite in Docker. You don't need Go installed |
+| `make test-local` | Start Postgres, then run `go test -race ./...` with your local Go |
+| `make test-unit` | Run only the unit tests (`internal/...`). No database needed |
+| `make fmt` | Format the Go code (`go fmt`) |
+| `make vet` | Run `go vet` |
+| `make psql` | Open a `psql` shell in the database container |
+| `make clean` | Stop the containers **and delete the volumes**. This wipes the database |
 
 ## Run the tests
 
 **Option A: everything in Docker (no Go needed)**
 
 ```bash
-docker compose --profile test run --rm tests
+make test        # or: docker compose --profile test run --rm tests
 ```
 
 **Option B: with Go 1.25 installed locally**
+
+```bash
+make test-local
+```
+
+This is the same as running:
 
 ```bash
 docker compose up -d db
