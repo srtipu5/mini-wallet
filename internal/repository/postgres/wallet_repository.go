@@ -50,16 +50,34 @@ func (r *walletRepository) Get(ctx context.Context, id string) (domain.Wallet, e
 	return w, err
 }
 
-// Lock takes a row lock on the wallet (SELECT ... FOR UPDATE) and returns its
-// current balance. Other transactions that want to change this wallet wait
-// until our transaction commits or rolls back.
-func (r *walletRepository) Lock(ctx context.Context, id string) (int64, error) {
-	var balance int64
-	err := r.db.QueryRow(ctx, `SELECT balance FROM wallets WHERE id = $1 FOR UPDATE`, id).Scan(&balance)
-	if errors.Is(err, pgx.ErrNoRows) {
-		return 0, domain.ErrWalletNotFound
+// LockBalances locks the given wallets and returns their balances by id.
+//
+// ORDER BY id makes Postgres lock the rows in id order. Every transfer locks
+// its two wallets in that same order, so A->B and B->A (or any cycle such as
+// A->B, B->C, C->A) running at the same time wait for each other instead of
+// deadlocking. Other transactions that want to change these wallets wait
+// until ours commits or rolls back.
+func (r *walletRepository) LockBalances(ctx context.Context, ids ...string) (map[string]int64, error) {
+	rows, err := r.db.Query(ctx,
+		`SELECT id::text, balance FROM wallets
+		 WHERE id = ANY($1::uuid[])
+		 ORDER BY id
+		 FOR UPDATE`, ids)
+	if err != nil {
+		return nil, err
 	}
-	return balance, err
+	defer rows.Close()
+
+	balances := make(map[string]int64, len(ids))
+	for rows.Next() {
+		var id string
+		var balance int64
+		if err := rows.Scan(&id, &balance); err != nil {
+			return nil, err
+		}
+		balances[id] = balance
+	}
+	return balances, rows.Err()
 }
 
 // ChangeBalance adds delta (positive or negative) to the balance and returns

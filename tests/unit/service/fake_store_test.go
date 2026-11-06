@@ -23,9 +23,9 @@ type fakeStore struct {
 	nextWallet, nextTx, nextTransfer int
 
 	// Instrumentation for assertions.
-	txBegun    int      // number of WithinTx calls
-	locks      []string // wallet ids in the order Lock was called
-	walletGets int      // number of Wallets.Get calls
+	txBegun    int        // number of WithinTx calls
+	lockCalls  [][]string // ids passed to each LockBalances call
+	walletGets int        // number of Wallets.Get calls
 
 	// Fault injection.
 	pingErr        error
@@ -146,13 +146,15 @@ func (r fakeWallets) Get(_ context.Context, id string) (domain.Wallet, error) {
 	return w, nil
 }
 
-func (r fakeWallets) Lock(_ context.Context, id string) (int64, error) {
-	r.f.locks = append(r.f.locks, id)
-	w, ok := r.f.wallets[id]
-	if !ok {
-		return 0, domain.ErrWalletNotFound
+func (r fakeWallets) LockBalances(_ context.Context, ids ...string) (map[string]int64, error) {
+	r.f.lockCalls = append(r.f.lockCalls, append([]string(nil), ids...))
+	balances := map[string]int64{}
+	for _, id := range ids {
+		if w, ok := r.f.wallets[id]; ok {
+			balances[id] = w.Balance
+		}
 	}
-	return w.Balance, nil
+	return balances, nil
 }
 
 func (r fakeWallets) ChangeBalance(_ context.Context, id string, delta int64) (int64, error) {

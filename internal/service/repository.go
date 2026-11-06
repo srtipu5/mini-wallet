@@ -16,9 +16,11 @@ import (
 type WalletRepository interface {
 	Create(ctx context.Context, userID, phone string) (domain.Wallet, error)
 	Get(ctx context.Context, id string) (domain.Wallet, error)
-	// Lock takes a row lock (SELECT ... FOR UPDATE) and returns the balance.
-	// Only meaningful inside Store.WithinTx.
-	Lock(ctx context.Context, id string) (int64, error)
+	// LockBalances locks the given wallets with SELECT ... FOR UPDATE, always
+	// in wallet id order, and returns their balances by id. Wallets that do
+	// not exist are missing from the map. Only meaningful inside
+	// Store.WithinTx.
+	LockBalances(ctx context.Context, ids ...string) (map[string]int64, error)
 	// ChangeBalance adds delta (may be negative) and returns the new balance.
 	ChangeBalance(ctx context.Context, id string, delta int64) (int64, error)
 }

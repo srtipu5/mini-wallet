@@ -276,3 +276,33 @@ func TestTransfer_MaxAmount(t *testing.T) {
 		t.Fatal("max-amount transfer did not move the full amount")
 	}
 }
+
+// A->B, B->C and C->A all at the same time. Without a fixed lock order each
+// transfer could hold one wallet and wait for the next, forming a cycle that
+// Postgres aborts as a deadlock (which would surface here as a 500).
+func TestTransfer_ConcurrentCycleNoDeadlock(t *testing.T) {
+	resetDB(t)
+	wallets := []string{createWallet(t, "u_a"), createWallet(t, "u_b"), createWallet(t, "u_c")}
+	for _, w := range wallets {
+		addMoney(t, w, 100000)
+	}
+
+	const n = 60
+	responses := make([]response, n)
+	runConcurrently(n, func(i int) {
+		from, to := wallets[i%3], wallets[(i+1)%3]
+		responses[i] = transfer(t, from, to, 1000, fmt.Sprintf("cycle-%d", i))
+	})
+
+	for i, r := range responses {
+		if r.Status != http.StatusCreated {
+			t.Fatalf("transfer %d: status %d, body %s", i, r.Status, r.Body)
+		}
+	}
+	// Each wallet sent and received 20 x 1000, so every balance is unchanged.
+	for _, w := range wallets {
+		if b := balanceOf(t, w); b != 100000 {
+			t.Fatalf("wallet %s balance = %d, want 100000", w, b)
+		}
+	}
+}

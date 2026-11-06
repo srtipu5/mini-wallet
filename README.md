@@ -13,46 +13,18 @@ That is the only command needed. The API image is built on the first run, and th
 API runs on **http://localhost:8080**. Postgres starts first, and migrations run
 automatically when the API starts.
 
-- After changing the code, rebuild with `docker compose up --build` (or `make up`).
+- After changing the code, rebuild with `docker compose up --build`.
 - To use other host ports: `API_PORT=9090 DB_PORT=5433 docker compose up`.
-
-## Make commands
-
-The [`Makefile`](Makefile) wraps the common Docker and Go commands. Run `make` on
-its own to list them all.
-
-| Command | What it does |
-|---|---|
-| `make up` | Build and start the API and Postgres in the foreground (`docker compose up --build`) |
-| `make up-d` | Same as `make up`, but in the background |
-| `make down` | Stop and remove the containers. The database data is kept |
-| `make restart` | Run `make down`, then `make up-d` |
-| `make logs` | Follow the API logs |
-| `make ps` | Show container status |
-| `make db` | Start only Postgres, in the background |
-| `make test` | Run the full test suite in Docker. You don't need Go installed |
-| `make test-local` | Start Postgres, then run `go test -race ./...` with your local Go |
-| `make test-unit` | Run only the unit tests (`tests/unit/...`). No database needed |
-| `make fmt` | Format the Go code (`go fmt`) |
-| `make vet` | Run `go vet` |
-| `make psql` | Open a `psql` shell in the database container |
-| `make clean` | Stop the containers **and delete the volumes**. This wipes the database |
 
 ## Run the tests
 
 **Option A: everything in Docker (no Go needed)**
 
 ```bash
-make test        # or: docker compose --profile test run --rm tests
+docker compose --profile test run --rm tests
 ```
 
 **Option B: with Go 1.25 installed locally**
-
-```bash
-make test-local
-```
-
-This is the same as running:
 
 ```bash
 docker compose up -d db
@@ -64,7 +36,7 @@ All tests live in `tests/`, split by kind:
 
 ```
 tests/
-  unit/                 no database needed (make test-unit)
+  unit/                 no database needed: go test ./tests/unit/...
     domain/               validation rules, error codes
     service/              business logic against an in-memory fake repository
     handler/              routing, request rejection, history query parsing
@@ -77,7 +49,7 @@ tests/
 - **Unit tests** test each layer through its public API only. The service
   tests use a fake store (`tests/unit/service/fake_store_test.go`) that
   implements the repository interfaces in memory and imitates rollback. They check
-  balance rules, sorted lock order, rollback when a step fails, and idempotency
+  balance rules, locking both wallets together, rollback when a step fails, and idempotency
   (replay, reuse, released keys).
 - **Integration tests** (`tests/integration/`) cover every rule below, including the
   concurrency cases: double-spend races, the same idempotency key sent 20 times at
@@ -153,8 +125,10 @@ Every error uses the same envelope: `{"error": {"code": "...", "message": "..."}
 2. **Row locks prevent double-spending.** A transfer locks both wallets with
    `SELECT ... FOR UPDATE` before it checks the balance. A second transfer from the
    same wallet waits, then sees the updated balance.
-3. **No deadlocks.** Both wallets are always locked in the same (sorted) order. So
-   A→B and B→A running at the same time just wait for each other briefly instead of
+3. **No deadlocks.** A transfer locks both wallets in one query,
+   `SELECT ... WHERE id = ANY(...) ORDER BY id FOR UPDATE`, so every transfer takes
+   the locks in the same (wallet id) order. A→B and B→A, or a cycle such as A→B,
+   B→C, C→A, running at the same time just wait for each other briefly instead of
    deadlocking.
 4. **The database is the safety net.** `CHECK (balance >= 0)` and
    `CHECK (from <> to)` constraints, plus unique indexes on `user_id`, `phone`, and

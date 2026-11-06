@@ -51,23 +51,17 @@ func validateTransfer(in dto.TransferInput) error {
 
 // executeTransfer runs inside the transaction opened by runIdempotent.
 func executeTransfer(ctx context.Context, r Repositories, in dto.TransferInput) (domain.Transfer, error) {
-	// 1. Lock both wallets, ALWAYS in the same (sorted) order.
-	//    If A->B and B->A run at the same time, both lock the smaller id first,
-	//    so one simply waits for the other instead of deadlocking.
-	first, second := in.FromWalletID, in.ToWalletID
-	if second < first {
-		first, second = second, first
+	// 1. Lock both wallets in ONE query. The repository locks them in wallet
+	//    id order (ORDER BY id ... FOR UPDATE), which prevents deadlocks.
+	balances, err := r.Wallets.LockBalances(ctx, in.FromWalletID, in.ToWalletID)
+	if err != nil {
+		return domain.Transfer{}, err
 	}
-	balances := map[string]int64{}
-	for _, id := range []string{first, second} {
-		balance, err := r.Wallets.Lock(ctx, id)
-		if err != nil {
-			if id == in.FromWalletID {
-				return domain.Transfer{}, notFound("sender", err)
-			}
-			return domain.Transfer{}, notFound("receiver", err)
-		}
-		balances[id] = balance
+	if _, ok := balances[in.FromWalletID]; !ok {
+		return domain.Transfer{}, domain.NewError(domain.CodeWalletNotFound, "sender wallet not found")
+	}
+	if _, ok := balances[in.ToWalletID]; !ok {
+		return domain.Transfer{}, domain.NewError(domain.CodeWalletNotFound, "receiver wallet not found")
 	}
 
 	// 2. Check the balance. Safe because nobody else can change it while we hold the lock.
@@ -108,12 +102,4 @@ func executeTransfer(ctx context.Context, r Repositories, in dto.TransferInput) 
 	}
 
 	return transfer, nil
-}
-
-// notFound turns a generic "wallet not found" into "sender/receiver wallet not found".
-func notFound(who string, err error) error {
-	if e, ok := domain.AsError(err); ok && e.Code == domain.CodeWalletNotFound {
-		return domain.NewError(domain.CodeWalletNotFound, who+" wallet not found")
-	}
-	return err
 }

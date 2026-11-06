@@ -355,21 +355,26 @@ func TestTransfer_InsufficientBalance(t *testing.T) {
 	}
 }
 
-// Both wallets are always locked in sorted order, whichever direction the
-// money goes. This is what prevents deadlocks between A->B and B->A.
-func TestTransfer_LocksWalletsInSortedOrder(t *testing.T) {
+// Both wallets must be locked together in one call, so the repository can
+// lock them in id order (ORDER BY id ... FOR UPDATE). Locking them one by one
+// in transfer direction would deadlock A->B against B->A. The real ordering is
+// proven against Postgres by the integration deadlock tests.
+func TestTransfer_LocksBothWalletsInOneCall(t *testing.T) {
 	svc, f := newTestService()
-	low := newWallet(t, svc, 5000)  // ids are sequential, so low.ID < high.ID
-	high := newWallet(t, svc, 5000) //
-	want := []string{low.ID, high.ID}
+	a := newWallet(t, svc, 5000)
+	b := newWallet(t, svc, 5000)
 
-	for i, dir := range [][2]string{{low.ID, high.ID}, {high.ID, low.ID}} {
-		f.locks = nil
+	for i, dir := range [][2]string{{a.ID, b.ID}, {b.ID, a.ID}} {
+		f.lockCalls = nil
 		if _, _, err := svc.Transfer(ctx, fmt.Sprint("t", i), dto.TransferInput{FromWalletID: dir[0], ToWalletID: dir[1], Amount: 100}); err != nil {
 			t.Fatal(err)
 		}
-		if fmt.Sprint(f.locks) != fmt.Sprint(want) {
-			t.Fatalf("transfer %s -> %s locked %v, want %v", dir[0], dir[1], f.locks, want)
+		if len(f.lockCalls) != 1 || len(f.lockCalls[0]) != 2 {
+			t.Fatalf("want one LockBalances call with both wallets, got %v", f.lockCalls)
+		}
+		got := map[string]bool{f.lockCalls[0][0]: true, f.lockCalls[0][1]: true}
+		if !got[a.ID] || !got[b.ID] {
+			t.Fatalf("locked %v, want both %s and %s", f.lockCalls[0], a.ID, b.ID)
 		}
 	}
 }

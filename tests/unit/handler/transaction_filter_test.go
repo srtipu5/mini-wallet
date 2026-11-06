@@ -32,9 +32,9 @@ type anyWallet struct{}
 func (anyWallet) Get(_ context.Context, id string) (domain.Wallet, error) {
 	return domain.Wallet{ID: id}, nil
 }
-func (anyWallet) Create(context.Context, string, string) (domain.Wallet, error) { panic("unused") }
-func (anyWallet) Lock(context.Context, string) (int64, error)                   { panic("unused") }
-func (anyWallet) ChangeBalance(context.Context, string, int64) (int64, error)   { panic("unused") }
+func (anyWallet) Create(context.Context, string, string) (domain.Wallet, error)     { panic("unused") }
+func (anyWallet) LockBalances(context.Context, ...string) (map[string]int64, error) { panic("unused") }
+func (anyWallet) ChangeBalance(context.Context, string, int64) (int64, error)       { panic("unused") }
 
 type recordingTransactions struct{ s *recordingStore }
 
