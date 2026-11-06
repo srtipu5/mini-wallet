@@ -63,7 +63,7 @@ All tests live in `tests/`, split by kind:
 tests/
   unit/                 no database needed (make test-unit)
     domain/               validation rules, error codes
-    application/          business logic against an in-memory fake of the ports
+    service/              business logic against an in-memory fake of the ports
     handler/              routing, request rejection, history query parsing
     middleware/           panic recovery, request logging
     utils/                JSON decoding, error-to-status mapping, query parsing
@@ -71,8 +71,8 @@ tests/
   integration/          real HTTP requests against a real Postgres
 ```
 
-- **Unit tests** test each layer through its public API only. The application
-  tests use a fake store (`tests/unit/application/fake_store_test.go`) that
+- **Unit tests** test each layer through its public API only. The service
+  tests use a fake store (`tests/unit/service/fake_store_test.go`) that
   implements the repository ports in memory and imitates rollback. They check
   balance rules, sorted lock order, rollback when a step fails, and idempotency
   (replay, reuse, released keys).
@@ -161,7 +161,7 @@ Every error uses the same envelope: `{"error": {"code": "...", "message": "..."}
 
 ### Idempotency
 
-Implemented in [`internal/application/idempotency.go`](internal/application/idempotency.go):
+Implemented in [`internal/service/idempotency.go`](internal/service/idempotency.go):
 
 1. Inside the money transaction, the service runs
    `INSERT INTO idempotency_keys ... ON CONFLICT DO NOTHING`.
@@ -206,12 +206,12 @@ The code follows a pragmatic Clean Architecture. Folders are grouped by layer,
 and dependencies only point inwards:
 
 ```
-delivery (HTTP)  ──►  application (use cases)  ──►  domain
-infrastructure (Postgres)  ──implements──►  application ports
+delivery (HTTP)  ──►  service (use cases)  ──►  domain
+infrastructure (Postgres)  ──implements──►  service ports
 ```
 
-The business logic in `application` never imports HTTP or a database driver. It
-talks to the database only through the interfaces in `application/ports.go`,
+The business logic in `service` never imports HTTP or a database driver. It
+talks to the database only through the interfaces in `service/ports.go`,
 which `infrastructure/repository` implements.
 
 ```
@@ -220,7 +220,7 @@ internal/
   domain/                            entities, error codes, validation rules (no dependencies)
   dto/                               data shapes crossing layers, one file per resource:
                                        HTTP request bodies, use-case inputs, history page
-  application/                       use cases (business logic)
+  service/                           use cases (business logic)
     ports.go                           interfaces the use cases need: repositories + Store (transactions)
     *_service.go                       wallet, add money, transfer, transaction history
     idempotency.go                     exactly-once execution for add money and transfers

@@ -6,26 +6,26 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"github.com/srtipu5/mini-wallet/internal/application"
+	"github.com/srtipu5/mini-wallet/internal/service"
 )
 
-// Store implements application.Store on a pgx connection pool.
+// Store implements service.Store on a pgx connection pool.
 type Store struct {
 	pool *pgxpool.Pool
 }
 
-var _ application.Store = (*Store)(nil)
+var _ service.Store = (*Store)(nil)
 
 func NewStore(pool *pgxpool.Pool) *Store {
 	return &Store{pool: pool}
 }
 
-func (s *Store) Repos() application.Repositories {
+func (s *Store) Repos() service.Repositories {
 	return newRepositories(s.pool)
 }
 
 // WithinTx commits if fn returns nil and rolls back otherwise.
-func (s *Store) WithinTx(ctx context.Context, fn func(r application.Repositories) error) error {
+func (s *Store) WithinTx(ctx context.Context, fn func(r service.Repositories) error) error {
 	return pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
 		return fn(newRepositories(tx))
 	})
@@ -36,8 +36,8 @@ func (s *Store) Ping(ctx context.Context) error {
 }
 
 // newRepositories builds every repository on the same connection or transaction.
-func newRepositories(db DBTX) application.Repositories {
-	return application.Repositories{
+func newRepositories(db DBTX) service.Repositories {
+	return service.Repositories{
 		Wallets:      &walletRepository{db: db},
 		Transactions: &transactionRepository{db: db},
 		Transfers:    &transferRepository{db: db},

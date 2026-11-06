@@ -6,15 +6,15 @@ import (
 
 	"github.com/jackc/pgx/v5"
 
-	"github.com/srtipu5/mini-wallet/internal/application"
 	"github.com/srtipu5/mini-wallet/internal/domain"
+	"github.com/srtipu5/mini-wallet/internal/service"
 )
 
 type walletRepository struct {
 	db DBTX
 }
 
-var _ application.WalletRepository = (*walletRepository)(nil)
+var _ service.WalletRepository = (*walletRepository)(nil)
 
 const walletColumns = `id::text, user_id, phone, currency, balance, created_at`
 

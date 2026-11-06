@@ -5,14 +5,14 @@ package routes
 import (
 	"net/http"
 
-	"github.com/srtipu5/mini-wallet/internal/application"
 	"github.com/srtipu5/mini-wallet/internal/delivery/http/handler"
 	"github.com/srtipu5/mini-wallet/internal/delivery/http/middleware"
+	"github.com/srtipu5/mini-wallet/internal/service"
 )
 
 // NewRouter registers every route and wraps them in the middleware chain.
 // Go 1.22+ ServeMux supports methods and {params} in patterns.
-func NewRouter(svc *application.Service) http.Handler {
+func NewRouter(svc *service.Service) http.Handler {
 	h := handler.New(svc)
 	mux := http.NewServeMux()
 

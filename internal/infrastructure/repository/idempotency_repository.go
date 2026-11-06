@@ -6,15 +6,15 @@ import (
 
 	"github.com/jackc/pgx/v5"
 
-	"github.com/srtipu5/mini-wallet/internal/application"
 	"github.com/srtipu5/mini-wallet/internal/domain"
+	"github.com/srtipu5/mini-wallet/internal/service"
 )
 
 type idempotencyRepository struct {
 	db DBTX
 }
 
-var _ application.IdempotencyRepository = (*idempotencyRepository)(nil)
+var _ service.IdempotencyRepository = (*idempotencyRepository)(nil)
 
 // Claim tries to reserve (scope, key). It must run inside a transaction.
 //

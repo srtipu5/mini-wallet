@@ -1,4 +1,4 @@
-package application_test
+package service_test
 
 import (
 	"context"
@@ -9,22 +9,22 @@ import (
 
 	"github.com/srtipu5/mini-wallet/internal/domain"
 
-	"github.com/srtipu5/mini-wallet/internal/application"
 	"github.com/srtipu5/mini-wallet/internal/dto"
+	"github.com/srtipu5/mini-wallet/internal/service"
 )
 
 var ctx = context.Background()
 
 const unknownWalletID = "00000000-0000-4000-8000-999999999999"
 
-func newTestService() (*application.Service, *fakeStore) {
+func newTestService() (*service.Service, *fakeStore) {
 	f := newFakeStore()
-	return application.NewService(f), f
+	return service.New(f), f
 }
 
 var phoneSeq int
 
-func newWallet(t *testing.T, svc *application.Service, balance int64) domain.Wallet {
+func newWallet(t *testing.T, svc *service.Service, balance int64) domain.Wallet {
 	t.Helper()
 	phoneSeq++
 	w, err := svc.CreateWallet(ctx, fmt.Sprintf("user_%d", phoneSeq), fmt.Sprintf("0171%07d", phoneSeq))

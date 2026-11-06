@@ -5,15 +5,15 @@ import (
 
 	"github.com/jackc/pgx/v5"
 
-	"github.com/srtipu5/mini-wallet/internal/application"
 	"github.com/srtipu5/mini-wallet/internal/domain"
+	"github.com/srtipu5/mini-wallet/internal/service"
 )
 
 type transactionRepository struct {
 	db DBTX
 }
 
-var _ application.TransactionRepository = (*transactionRepository)(nil)
+var _ service.TransactionRepository = (*transactionRepository)(nil)
 
 // Insert writes one ledger entry and fills in its ID and CreatedAt.
 func (r *transactionRepository) Insert(ctx context.Context, walletID string, t *domain.Transaction) error {

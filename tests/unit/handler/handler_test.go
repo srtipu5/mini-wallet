@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/srtipu5/mini-wallet/internal/application"
+	"github.com/srtipu5/mini-wallet/internal/service"
 
 	"github.com/srtipu5/mini-wallet/internal/delivery/http/routes"
 )
@@ -19,20 +19,20 @@ import (
 // Recover middleware turns that into a 500 the tests would catch.
 type stubStore struct{ pingErr error }
 
-func (s stubStore) Repos() application.Repositories { return application.Repositories{} }
-func (s stubStore) WithinTx(_ context.Context, fn func(application.Repositories) error) error {
-	return fn(application.Repositories{})
+func (s stubStore) Repos() service.Repositories { return service.Repositories{} }
+func (s stubStore) WithinTx(_ context.Context, fn func(service.Repositories) error) error {
+	return fn(service.Repositories{})
 }
 func (s stubStore) Ping(context.Context) error { return s.pingErr }
 
-func serve(t *testing.T, store application.Store, method, path, body string, headers map[string]string) *httptest.ResponseRecorder {
+func serve(t *testing.T, store service.Store, method, path, body string, headers map[string]string) *httptest.ResponseRecorder {
 	t.Helper()
 	req := httptest.NewRequest(method, path, strings.NewReader(body))
 	for k, v := range headers {
 		req.Header.Set(k, v)
 	}
 	rec := httptest.NewRecorder()
-	routes.NewRouter(application.NewService(store)).ServeHTTP(rec, req)
+	routes.NewRouter(service.New(store)).ServeHTTP(rec, req)
 	return rec
 }
 

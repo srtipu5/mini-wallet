@@ -3,15 +3,15 @@ package repository
 import (
 	"context"
 
-	"github.com/srtipu5/mini-wallet/internal/application"
 	"github.com/srtipu5/mini-wallet/internal/domain"
+	"github.com/srtipu5/mini-wallet/internal/service"
 )
 
 type transferRepository struct {
 	db DBTX
 }
 
-var _ application.TransferRepository = (*transferRepository)(nil)
+var _ service.TransferRepository = (*transferRepository)(nil)
 
 func (r *transferRepository) Insert(ctx context.Context, fromID, toID string, amount int64, note *string) (domain.Transfer, error) {
 	t := domain.Transfer{

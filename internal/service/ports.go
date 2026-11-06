@@ -1,4 +1,4 @@
-package application
+package service
 
 import (
 	"context"
@@ -8,7 +8,7 @@ import (
 
 // Ports: the interfaces the business logic needs from the outside world.
 // They are defined here (the inner layer) and implemented by the
-// repository package (the outer layer), so the application never imports
+// repository package (the outer layer), so the service layer never imports
 // a database driver.
 
 type WalletRepository interface {

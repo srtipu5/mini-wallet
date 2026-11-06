@@ -1,4 +1,4 @@
-package application_test
+package service_test
 
 import (
 	"context"
@@ -8,10 +8,10 @@ import (
 
 	"github.com/srtipu5/mini-wallet/internal/domain"
 
-	"github.com/srtipu5/mini-wallet/internal/application"
+	"github.com/srtipu5/mini-wallet/internal/service"
 )
 
-// fakeStore is an in-memory implementation of the application.Store port, so the business
+// fakeStore is an in-memory implementation of the service.Store port, so the business
 // logic can be tested without Postgres. WithinTx snapshots the state and
 // restores it if fn fails, which mimics a database rollback.
 type fakeStore struct {
@@ -48,10 +48,10 @@ func newFakeStore() *fakeStore {
 	}
 }
 
-var _ application.Store = (*fakeStore)(nil)
+var _ service.Store = (*fakeStore)(nil)
 
-func (f *fakeStore) Repos() application.Repositories {
-	return application.Repositories{
+func (f *fakeStore) Repos() service.Repositories {
+	return service.Repositories{
 		Wallets:      fakeWallets{f},
 		Transactions: fakeTransactions{f},
 		Transfers:    fakeTransfers{f},
@@ -59,7 +59,7 @@ func (f *fakeStore) Repos() application.Repositories {
 	}
 }
 
-func (f *fakeStore) WithinTx(_ context.Context, fn func(r application.Repositories) error) error {
+func (f *fakeStore) WithinTx(_ context.Context, fn func(r service.Repositories) error) error {
 	f.txBegun++
 	snapshot := f.snapshot()
 	if err := fn(f.Repos()); err != nil {

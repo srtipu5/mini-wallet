@@ -7,9 +7,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/srtipu5/mini-wallet/internal/application"
 	"github.com/srtipu5/mini-wallet/internal/delivery/http/routes"
 	"github.com/srtipu5/mini-wallet/internal/domain"
+	"github.com/srtipu5/mini-wallet/internal/service"
 )
 
 // recordingStore captures the history filter the handler builds from the
@@ -18,10 +18,10 @@ type recordingStore struct {
 	got *domain.TransactionFilter
 }
 
-func (s *recordingStore) Repos() application.Repositories {
-	return application.Repositories{Wallets: anyWallet{}, Transactions: recordingTransactions{s}}
+func (s *recordingStore) Repos() service.Repositories {
+	return service.Repositories{Wallets: anyWallet{}, Transactions: recordingTransactions{s}}
 }
-func (s *recordingStore) WithinTx(context.Context, func(application.Repositories) error) error {
+func (s *recordingStore) WithinTx(context.Context, func(service.Repositories) error) error {
 	panic("not used by history")
 }
 func (s *recordingStore) Ping(context.Context) error { return nil }
@@ -53,7 +53,7 @@ func filterFor(t *testing.T, query string) (*domain.TransactionFilter, int) {
 	t.Helper()
 	store := &recordingStore{}
 	rec := httptest.NewRecorder()
-	routes.NewRouter(application.NewService(store)).ServeHTTP(rec, httptest.NewRequest("GET", historyURL+query, nil))
+	routes.NewRouter(service.New(store)).ServeHTTP(rec, httptest.NewRequest("GET", historyURL+query, nil))
 	return store.got, rec.Code
 }
 

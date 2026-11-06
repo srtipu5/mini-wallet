@@ -1,7 +1,7 @@
-// Package application holds the business logic (use cases): validation,
+// Package service holds the business logic (use cases): validation,
 // locking order, balance checks and idempotency. It knows nothing about HTTP
 // or about which database is used; it only talks to the ports in ports.go.
-package application
+package service
 
 import "context"
 
@@ -9,7 +9,7 @@ type Service struct {
 	store Store
 }
 
-func NewService(store Store) *Service {
+func New(store Store) *Service {
 	return &Service{store: store}
 }
 

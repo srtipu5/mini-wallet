@@ -1,5 +1,5 @@
-// Package repository is the PostgreSQL implementation of the application
-// ports (see internal/application/ports.go). It contains all SQL.
+// Package repository is the PostgreSQL implementation of the service
+// ports (see internal/service/ports.go). It contains all SQL.
 package repository
 
 import (
