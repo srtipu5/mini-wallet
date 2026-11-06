@@ -54,7 +54,7 @@ func ValidateAmount(amount int64) error {
 
 func ValidatePhone(phone string) error {
 	if !phonePattern.MatchString(phone) {
-		return Validation("Phone must be a valid Bangladeshi mobile number like 01711000001")
+		return Validation("Phone must be a valid Bangladeshi mobile number.")
 	}
 	return nil
 }
