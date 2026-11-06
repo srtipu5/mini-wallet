@@ -3,17 +3,61 @@
 A small wallet backend: create wallets, add money from a payment gateway, send P2P
 transfers, and view transaction history. It is written in Go with PostgreSQL.
 
-## Run it
+## Getting started
+
+### Prerequisites
+
+- [Git](https://git-scm.com/downloads)
+- [Docker](https://docs.docker.com/get-docker/) with Docker Compose v2 (`docker compose version` should work)
+
+Go and PostgreSQL do **not** need to be installed. Both run inside Docker.
+
+### 1. Clone the repository
+
+```bash
+git clone https://github.com/srtipu5/mini-wallet.git
+cd mini-wallet
+```
+
+### 2. Run it
 
 ```bash
 docker compose up
 ```
 
-That is the only command needed. The API image is built on the first run, and the
-API runs on **http://localhost:8080**. Postgres starts first, and migrations run
-automatically when the API starts.
+That is the only command needed. The first run downloads the images and builds the
+API, which takes a minute or two. Postgres starts first, migrations run
+automatically, and the API is ready when the log shows `"msg":"server started"`.
 
-- After changing the code, rebuild with `docker compose up --build`.
+### 3. Check that it works
+
+In a second terminal:
+
+```bash
+curl localhost:8080/health
+# {"status":"ok"}
+```
+
+The API runs on **http://localhost:8080**. See [API](#api) below for every endpoint
+with example requests and responses.
+
+### Stop it
+
+| Command | What it does |
+|---|---|
+| `Ctrl+C` | Stops the containers. The data is kept |
+| `docker compose down` | Stops and removes the containers. The data is kept |
+| `docker compose down -v` | Also deletes the database volume, so the next start is empty |
+
+After changing the code, rebuild with `docker compose up --build`.
+
+### Troubleshooting
+
+- **Port already in use** (another app on 8080, or a local Postgres on 5432): choose
+  other host ports, for example `API_PORT=9090 DB_PORT=5433 docker compose up`.
+  The API is then on `localhost:9090`.
+- **`Cannot connect to the Docker daemon`**: Docker is not running. Start Docker
+  Desktop, or the Docker service, and try again.
 
 ## API
 
