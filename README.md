@@ -31,8 +31,7 @@ transfer must be between **100** and **2,500,000** poisha.
 
 ### Examples
 
-Real requests and responses from a fresh database. Wallet A is `56055a57…` and
-wallet B is `971c93db…`; replace the ids with your own when you try them.
+Real requests and responses from a fresh database.
 
 #### Create a wallet
 
