@@ -2,6 +2,7 @@ package tests
 
 import (
 	"net/http"
+	"strings"
 	"testing"
 	"time"
 )
@@ -119,4 +120,93 @@ func TestHistory_Errors(t *testing.T) {
 	if data, ok := r.JSON(t)["data"].([]any); !ok || len(data) != 0 {
 		t.Fatalf("want empty array, got %s", r.Body)
 	}
+}
+
+// The receiver's history shows TRANSFER_IN with the sender as counterparty.
+func TestHistory_ReceiverSide(t *testing.T) {
+	resetDB(t)
+	a := createWallet(t, "u_a")
+	b := createWallet(t, "u_b")
+	addMoney(t, a, 5000)
+	tr := transfer(t, a, b, 1200, "t1")
+	expectStatus(t, tr, 201)
+
+	r := call(t, "GET", historyPath(b, ""), nil, "")
+	expectStatus(t, r, 200)
+	data := r.JSON(t)["data"].([]any)
+	if len(data) != 1 {
+		t.Fatalf("want 1 entry, got %s", r.Body)
+	}
+	e := data[0].(map[string]any)
+	if e["type"] != "TRANSFER_IN" || e["amount"] != 1200.0 || e["balance_after"] != 1200.0 ||
+		e["counterparty_wallet_id"] != a || e["reference_id"] != tr.JSON(t)["transfer_id"] {
+		t.Fatalf("unexpected entry: %v", e)
+	}
+}
+
+func TestHistory_AddMoneyReferencesGatewayRef(t *testing.T) {
+	resetDB(t)
+	a := createWallet(t, "u_a")
+	expectStatus(t, call(t, "POST", addMoneyPath(a), `{"amount":1000,"gateway_ref":"GW-REF-42"}`, "k"), 201)
+
+	e := call(t, "GET", historyPath(a, ""), nil, "").JSON(t)["data"].([]any)[0].(map[string]any)
+	if e["reference_id"] != "GW-REF-42" || e["counterparty_wallet_id"] != nil {
+		t.Fatalf("unexpected entry: %v", e)
+	}
+}
+
+func TestHistory_QueryFormats(t *testing.T) {
+	resetDB(t)
+	a := createWallet(t, "u_a")
+	addMoney(t, a, 1000)
+	count := func(query string) int {
+		r := call(t, "GET", historyPath(a, query), nil, "")
+		expectStatus(t, r, 200)
+		return len(r.JSON(t)["data"].([]any))
+	}
+
+	if count("?type=add_money") != 1 {
+		t.Fatal("type must be case-insensitive")
+	}
+	hourAgo := time.Now().Add(-time.Hour).UTC().Format(time.RFC3339)
+	inHour := time.Now().Add(time.Hour).UTC().Format(time.RFC3339)
+	if count("?from="+hourAgo+"&to="+inHour) != 1 {
+		t.Fatal("date-time range around now must match")
+	}
+	if count("?to="+hourAgo) != 0 {
+		t.Fatal("date-time upper bound in the past must match nothing")
+	}
+	// Uppercase wallet id in the path.
+	if r := call(t, "GET", historyPath(strings.ToUpper(a), ""), nil, ""); r.Status != 200 {
+		t.Fatalf("uppercase wallet id: %d", r.Status)
+	}
+}
+
+func TestHistory_PageSizeLimits(t *testing.T) {
+	resetDB(t)
+	a := createWallet(t, "u_a")
+	for i := 0; i < 25; i++ {
+		addMoney(t, a, 100)
+	}
+	page := func(query string) (int, map[string]any) {
+		r := call(t, "GET", historyPath(a, query), nil, "")
+		expectStatus(t, r, 200)
+		body := r.JSON(t)
+		return len(body["data"].([]any)), body["pagination"].(map[string]any)
+	}
+
+	if n, p := page(""); n != 20 || p["page_size"] != 20.0 || p["total_items"] != 25.0 || p["total_pages"] != 2.0 {
+		t.Fatalf("default page: n=%d %v", n, p)
+	}
+	if n, _ := page("?page=2"); n != 5 {
+		t.Fatalf("page 2: n=%d, want 5", n)
+	}
+	if n, p := page("?page_size=1"); n != 1 || p["total_pages"] != 25.0 {
+		t.Fatalf("page_size=1: n=%d %v", n, p)
+	}
+	if n, _ := page("?page_size=100"); n != 25 {
+		t.Fatalf("page_size=100: n=%d", n)
+	}
+	expectError(t, call(t, "GET", historyPath(a, "?page_size=0"), nil, ""), 400, "VALIDATION_ERROR")
+	expectError(t, call(t, "GET", historyPath(a, "?page=-1"), nil, ""), 400, "VALIDATION_ERROR")
 }

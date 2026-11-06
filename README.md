@@ -29,7 +29,7 @@ its own to list them all.
 | `make db` | Start only Postgres, in the background |
 | `make test` | Run the full test suite in Docker. You don't need Go installed |
 | `make test-local` | Start Postgres, then run `go test -race ./...` with your local Go |
-| `make test-unit` | Run only the unit tests (`internal/...`). No database needed |
+| `make test-unit` | Run only the unit tests (`tests/unit/...`). No database needed |
 | `make fmt` | Format the Go code (`go fmt`) |
 | `make vet` | Run `go vet` |
 | `make psql` | Open a `psql` shell in the database container |
@@ -57,14 +57,31 @@ TEST_DATABASE_URL="postgres://wallet:wallet@localhost:5432/wallet_test?sslmode=d
   go test -race -count=1 ./...
 ```
 
-There are two kinds of tests:
+All tests live in `tests/`, split by kind:
 
-- **Unit tests** (`internal/...`) check validation and parsing, with no database.
-- **Integration tests** (`tests/`) send real HTTP requests to a real Postgres database.
-  They cover every rule below, including the concurrency cases: double-spend races,
-  the same idempotency key sent 20 times at once, opposite transfers A→B and B→A at
-  the same time (no deadlock), and the same `gateway_ref` sent under different keys.
-  They use a separate database, `wallet_test`, and skip themselves when
+```
+tests/
+  unit/                 no database needed (make test-unit)
+    domain/               validation rules, error codes
+    application/          business logic against an in-memory fake of the ports
+    handler/              routing, request rejection, history query parsing
+    middleware/           panic recovery, request logging
+    utils/                JSON decoding, error-to-status mapping, query parsing
+    config/               environment variables
+  integration/          real HTTP requests against a real Postgres
+```
+
+- **Unit tests** test each layer through its public API only. The application
+  tests use a fake store (`tests/unit/application/fake_store_test.go`) that
+  implements the repository ports in memory and imitates rollback. They check
+  balance rules, sorted lock order, rollback when a step fails, and idempotency
+  (replay, reuse, released keys).
+- **Integration tests** (`tests/integration/`) cover every rule below, including the
+  concurrency cases: double-spend races, the same idempotency key sent 20 times at
+  once, opposite transfers A→B and B→A at the same time (no deadlock), the same
+  `gateway_ref` sent under different keys, and mixed concurrent operations that must
+  conserve money and keep every wallet's history consistent with its balance. They
+  use a separate database, `wallet_test`, and skip themselves when
   `TEST_DATABASE_URL` is not set.
 
 ## API
@@ -220,5 +237,5 @@ internal/
   config/                            settings from environment variables (DATABASE_URL, PORT, timeouts)
   utils/                             shared helpers: JSON decoding, responses/errors, query params, env
 migrations/                          SQL schema (embedded into the binary)
-tests/                               end-to-end tests against real Postgres
+tests/                               all tests: unit/ (per layer, no DB) and integration/ (real Postgres)
 ```

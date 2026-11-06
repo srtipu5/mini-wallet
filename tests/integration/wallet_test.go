@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestCreateWallet(t *testing.T) {
@@ -97,4 +98,33 @@ func TestGetWallet(t *testing.T) {
 
 func TestUnknownRoute(t *testing.T) {
 	expectError(t, call(t, "GET", "/api/v1/nope", nil, ""), 404, "NOT_FOUND")
+}
+
+func TestCreateWallet_BodyTooLarge(t *testing.T) {
+	resetDB(t)
+	body := `{"user_id":"u_1","phone":"01711000001","x":"` + strings.Repeat("a", 2<<20) + `"}`
+	expectError(t, call(t, "POST", "/api/v1/wallets", body, ""), http.StatusBadRequest, "VALIDATION_ERROR")
+}
+
+func TestCreateWallet_ResponseShape(t *testing.T) {
+	resetDB(t)
+	r := call(t, "POST", "/api/v1/wallets", `{"user_id":"u_1","phone":"01711000001"}`, "")
+	expectStatus(t, r, 201)
+	if r.Header.Get("Content-Type") != "application/json" {
+		t.Fatal("responses must be JSON")
+	}
+	body := r.JSON(t)
+	for _, field := range []string{"wallet_id", "user_id", "phone", "currency", "balance", "created_at"} {
+		if _, ok := body[field]; !ok {
+			t.Errorf("missing field %q in %s", field, r.Body)
+		}
+	}
+	if _, err := time.Parse(time.RFC3339Nano, body["created_at"].(string)); err != nil {
+		t.Errorf("created_at is not ISO-8601: %v", err)
+	}
+	// GET returns the same wallet.
+	got := call(t, "GET", "/api/v1/wallets/"+body["wallet_id"].(string), nil, "").JSON(t)
+	if got["wallet_id"] != body["wallet_id"] || got["user_id"] != "u_1" || got["phone"] != "01711000001" {
+		t.Fatalf("GET returned %v", got)
+	}
 }

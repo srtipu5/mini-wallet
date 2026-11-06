@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"net/http"
+	"strings"
 	"testing"
 )
 
@@ -186,5 +187,92 @@ func TestTransfer_ConcurrentOppositeDirections(t *testing.T) {
 	}
 	if balanceOf(t, a) != 100000 || balanceOf(t, b) != 100000 {
 		t.Fatal("equal transfers each way should leave balances unchanged")
+	}
+}
+
+func TestTransfer_Note(t *testing.T) {
+	resetDB(t)
+	a := createWallet(t, "u_a")
+	b := createWallet(t, "u_b")
+	addMoney(t, a, 50000)
+	send := func(key string, note any) response {
+		body := map[string]any{"from_wallet_id": a, "to_wallet_id": b, "amount": 100}
+		if note != nil {
+			body["note"] = note
+		}
+		return call(t, "POST", "/api/v1/transfers", body, key)
+	}
+
+	// Omitted and blank notes are both returned as null.
+	for i, note := range []any{nil, "   "} {
+		r := send(fmt.Sprint("n", i), note)
+		expectStatus(t, r, 201)
+		if v, present := r.JSON(t)["note"]; !present || v != nil {
+			t.Fatalf("note %q: want null, got %s", note, r.Body)
+		}
+	}
+	expectStatus(t, send("n-max", strings.Repeat("x", 255)), 201)
+	expectError(t, send("n-long", strings.Repeat("x", 256)), 400, "VALIDATION_ERROR")
+	expectError(t, send("n-type", 123), 400, "VALIDATION_ERROR")
+}
+
+func TestTransfer_CaseInsensitiveWalletIDs(t *testing.T) {
+	resetDB(t)
+	a := createWallet(t, "u_a")
+	b := createWallet(t, "u_b")
+	addMoney(t, a, 5000)
+
+	r := transfer(t, strings.ToUpper(a), strings.ToUpper(b), 1000, "k1")
+	expectStatus(t, r, 201)
+	if body := r.JSON(t); body["from_wallet_id"] != a || body["to_wallet_id"] != b {
+		t.Fatalf("ids must be returned in canonical lowercase: %s", r.Body)
+	}
+	expectError(t, transfer(t, a, strings.ToUpper(a), 1000, "k2"), 400, "SAME_WALLET_TRANSFER")
+}
+
+func TestTransfer_NotFoundSaysWhichWallet(t *testing.T) {
+	resetDB(t)
+	a := createWallet(t, "u_a")
+	missing := "00000000-0000-0000-0000-000000000000"
+
+	for _, c := range []struct{ from, to, want string }{
+		{missing, a, "sender wallet not found"},
+		{a, missing, "receiver wallet not found"},
+	} {
+		r := transfer(t, c.from, c.to, 1000, randKey())
+		expectError(t, r, 404, "WALLET_NOT_FOUND")
+		if msg := r.JSON(t)["error"].(map[string]any)["message"]; msg != c.want {
+			t.Fatalf("message = %q, want %q", msg, c.want)
+		}
+	}
+}
+
+func TestTransfer_MissingFields(t *testing.T) {
+	resetDB(t)
+	a := createWallet(t, "u_a")
+	b := createWallet(t, "u_b")
+	addMoney(t, a, 5000)
+
+	expectError(t, call(t, "POST", "/api/v1/transfers",
+		fmt.Sprintf(`{"from_wallet_id":%q,"to_wallet_id":%q}`, a, b), "k1"), 400, "INVALID_AMOUNT")
+	expectError(t, call(t, "POST", "/api/v1/transfers",
+		fmt.Sprintf(`{"from_wallet_id":%q,"amount":1000}`, a), "k2"), 400, "VALIDATION_ERROR")
+	expectError(t, call(t, "POST", "/api/v1/transfers",
+		fmt.Sprintf(`{"from_wallet_id":%q,"to_wallet_id":%q,"amount":1000,"fee":5}`, a, b), "k3"), 400, "VALIDATION_ERROR")
+	expectError(t, call(t, "POST", "/api/v1/transfers", ``, "k4"), 400, "VALIDATION_ERROR")
+	if balanceOf(t, a) != 5000 {
+		t.Fatal("rejected transfers must not change balances")
+	}
+}
+
+// The maximum single transfer is allowed when the balance covers it.
+func TestTransfer_MaxAmount(t *testing.T) {
+	resetDB(t)
+	a := createWallet(t, "u_a")
+	b := createWallet(t, "u_b")
+	addMoney(t, a, 2500000)
+	expectStatus(t, transfer(t, a, b, 2500000, "k"), 201)
+	if balanceOf(t, a) != 0 || balanceOf(t, b) != 2500000 {
+		t.Fatal("max-amount transfer did not move the full amount")
 	}
 }
