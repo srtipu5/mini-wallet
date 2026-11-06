@@ -11,18 +11,18 @@ import (
 func (h *Handler) Transfer(w http.ResponseWriter, r *http.Request) {
 	key, err := utils.IdempotencyKey(r)
 	if err != nil {
-		utils.WriteError(w, r, err)
+		utils.SendError(w, r, err)
 		return
 	}
 
 	var req dto.TransferRequest
 	if err := utils.DecodeJSON(w, r, &req); err != nil {
-		utils.WriteError(w, r, err)
+		utils.SendError(w, r, err)
 		return
 	}
 	amount, err := utils.ParseAmount(req.Amount)
 	if err != nil {
-		utils.WriteError(w, r, err)
+		utils.SendError(w, r, err)
 		return
 	}
 
@@ -33,8 +33,8 @@ func (h *Handler) Transfer(w http.ResponseWriter, r *http.Request) {
 		Note:         req.Note,
 	})
 	if err != nil {
-		utils.WriteError(w, r, err)
+		utils.SendError(w, r, err)
 		return
 	}
-	utils.WriteIdempotent(w, replayed, transfer)
+	utils.SendIdempotent(w, replayed, transfer)
 }

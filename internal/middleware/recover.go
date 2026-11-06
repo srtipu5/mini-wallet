@@ -16,7 +16,7 @@ func Recover(next http.Handler) http.Handler {
 		defer func() {
 			if rec := recover(); rec != nil {
 				slog.Error("panic", "error", rec, "stack", string(debug.Stack()))
-				utils.WriteInternalError(w)
+				utils.SendInternalError(w)
 			}
 		}()
 		next.ServeHTTP(w, r)

@@ -35,7 +35,7 @@ type ErrorDetail struct {
 	Message string `json:"message"`
 }
 
-func WriteJSON(w http.ResponseWriter, status int, v any) {
+func SendData(w http.ResponseWriter, status int, v any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 	if err := json.NewEncoder(w).Encode(v); err != nil {
@@ -43,33 +43,33 @@ func WriteJSON(w http.ResponseWriter, status int, v any) {
 	}
 }
 
-// WriteError renders any error in the standard envelope.
+// SendError renders any error in the standard envelope.
 // Unknown (non-business) errors become a generic 500 so internals never leak.
-func WriteError(w http.ResponseWriter, r *http.Request, err error) {
+func SendError(w http.ResponseWriter, r *http.Request, err error) {
 	if e, ok := domain.AsError(err); ok {
 		status, known := statusByCode[e.Code]
 		if !known {
 			status = http.StatusBadRequest
 		}
-		WriteJSON(w, status, ErrorBody{ErrorDetail{e.Code, e.Message}})
+		SendData(w, status, ErrorBody{ErrorDetail{e.Code, e.Message}})
 		return
 	}
 
 	slog.Error("internal error", "method", r.Method, "path", r.URL.Path, "error", err)
-	WriteInternalError(w)
+	SendInternalError(w)
 }
 
-// WriteInternalError writes a generic 500 without any details.
-func WriteInternalError(w http.ResponseWriter) {
-	WriteJSON(w, http.StatusInternalServerError,
+// SendInternalError writes a generic 500 without any details.
+func SendInternalError(w http.ResponseWriter) {
+	SendData(w, http.StatusInternalServerError,
 		ErrorBody{ErrorDetail{domain.CodeInternal, "internal server error"}})
 }
 
-// WriteIdempotent writes a 201 for an idempotent operation and marks replays
+// SendIdempotent writes a 201 for an idempotent operation and marks replays
 // with a header, so clients (and tests) can tell a replay from a fresh execution.
-func WriteIdempotent(w http.ResponseWriter, replayed bool, v any) {
+func SendIdempotent(w http.ResponseWriter, replayed bool, v any) {
 	if replayed {
 		w.Header().Set("Idempotent-Replayed", "true")
 	}
-	WriteJSON(w, http.StatusCreated, v)
+	SendData(w, http.StatusCreated, v)
 }

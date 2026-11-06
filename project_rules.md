@@ -73,7 +73,7 @@ Check it with:
 
 - **Handler**: parse the request (`utils.DecodeJSON`, `utils.ParseAmount`,
   `utils.IdempotencyKey`), call the service, write the response with
-  `utils.WriteJSON` / `utils.WriteError` / `utils.WriteIdempotent`. No business
+  `utils.SendData` / `utils.SendError` / `utils.SendIdempotent`. No business
   rules, no SQL.
 - **Service**: validation, business rules, transactions (`store.WithinTx`),
   idempotency (`runIdempotent`). Talks to the database only through the

@@ -10,13 +10,13 @@ import (
 // GET /health
 func (h *Handler) Health(w http.ResponseWriter, r *http.Request) {
 	if err := h.svc.Ping(r.Context()); err != nil {
-		utils.WriteJSON(w, http.StatusServiceUnavailable, map[string]string{"status": "database unavailable"})
+		utils.SendData(w, http.StatusServiceUnavailable, map[string]string{"status": "database unavailable"})
 		return
 	}
-	utils.WriteJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+	utils.SendData(w, http.StatusOK, map[string]string{"status": "ok"})
 }
 
 // Fallback for unknown routes.
 func (h *Handler) NotFound(w http.ResponseWriter, r *http.Request) {
-	utils.WriteError(w, r, domain.NewError(domain.CodeNotFound, "route not found"))
+	utils.SendError(w, r, domain.NewError(domain.CodeNotFound, "route not found"))
 }

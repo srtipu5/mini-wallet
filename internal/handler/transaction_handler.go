@@ -13,17 +13,17 @@ import (
 func (h *Handler) ListTransactions(w http.ResponseWriter, r *http.Request) {
 	filter, err := parseTransactionFilter(r.URL.Query())
 	if err != nil {
-		utils.WriteError(w, r, err)
+		utils.SendError(w, r, err)
 		return
 	}
 	filter.WalletID = r.PathValue("wallet_id")
 
 	page, err := h.svc.ListTransactions(r.Context(), filter)
 	if err != nil {
-		utils.WriteError(w, r, err)
+		utils.SendError(w, r, err)
 		return
 	}
-	utils.WriteJSON(w, http.StatusOK, page)
+	utils.SendData(w, http.StatusOK, page)
 }
 
 // parseTransactionFilter validates the history query parameters.

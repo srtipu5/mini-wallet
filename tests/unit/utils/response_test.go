@@ -23,9 +23,9 @@ func decodeError(t *testing.T, rec *httptest.ResponseRecorder) utils.ErrorDetail
 	return body.Error
 }
 
-func TestWriteJSON(t *testing.T) {
+func TestSendData(t *testing.T) {
 	rec := httptest.NewRecorder()
-	utils.WriteJSON(rec, http.StatusTeapot, map[string]int{"a": 1})
+	utils.SendData(rec, http.StatusTeapot, map[string]int{"a": 1})
 	if rec.Code != http.StatusTeapot || rec.Header().Get("Content-Type") != "application/json" ||
 		strings.TrimSpace(rec.Body.String()) != `{"a":1}` {
 		t.Fatalf("got %d %q %q", rec.Code, rec.Header().Get("Content-Type"), rec.Body)
@@ -33,14 +33,14 @@ func TestWriteJSON(t *testing.T) {
 
 	// An unencodable value is logged; the status is already sent.
 	rec = httptest.NewRecorder()
-	utils.WriteJSON(rec, http.StatusOK, make(chan int))
+	utils.SendData(rec, http.StatusOK, make(chan int))
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status = %d", rec.Code)
 	}
 }
 
 // Every business error code must map to the documented HTTP status.
-func TestWriteError_StatusForEveryCode(t *testing.T) {
+func TestSendError_StatusForEveryCode(t *testing.T) {
 	want := map[string]int{
 		domain.CodeValidation:            400,
 		domain.CodeInvalidAmount:         400,
@@ -55,7 +55,7 @@ func TestWriteError_StatusForEveryCode(t *testing.T) {
 	}
 	for code, status := range want {
 		rec := httptest.NewRecorder()
-		utils.WriteError(rec, httptest.NewRequest("GET", "/", nil), domain.NewError(code, "msg "+code))
+		utils.SendError(rec, httptest.NewRequest("GET", "/", nil), domain.NewError(code, "msg "+code))
 		if rec.Code != status {
 			t.Errorf("%s: status = %d, want %d", code, rec.Code, status)
 		}
@@ -65,26 +65,26 @@ func TestWriteError_StatusForEveryCode(t *testing.T) {
 	}
 }
 
-func TestWriteError_WrappedDomainError(t *testing.T) {
+func TestSendError_WrappedDomainError(t *testing.T) {
 	rec := httptest.NewRecorder()
-	utils.WriteError(rec, httptest.NewRequest("GET", "/", nil), fmt.Errorf("context: %w", domain.ErrInsufficientBalance))
+	utils.SendError(rec, httptest.NewRequest("GET", "/", nil), fmt.Errorf("context: %w", domain.ErrInsufficientBalance))
 	if rec.Code != 422 || decodeError(t, rec).Code != domain.CodeInsufficientBalance {
 		t.Fatalf("wrapped error: %d %s", rec.Code, rec.Body)
 	}
 }
 
-func TestWriteError_UnmappedCodeIs400(t *testing.T) {
+func TestSendError_UnmappedCodeIs400(t *testing.T) {
 	rec := httptest.NewRecorder()
-	utils.WriteError(rec, httptest.NewRequest("GET", "/", nil), domain.NewError("SOMETHING_NEW", "x"))
+	utils.SendError(rec, httptest.NewRequest("GET", "/", nil), domain.NewError("SOMETHING_NEW", "x"))
 	if rec.Code != http.StatusBadRequest {
 		t.Fatalf("status = %d, want 400", rec.Code)
 	}
 }
 
 // Unexpected errors become a generic 500 and never leak their details.
-func TestWriteError_InternalErrorHidesDetails(t *testing.T) {
+func TestSendError_InternalErrorHidesDetails(t *testing.T) {
 	rec := httptest.NewRecorder()
-	utils.WriteError(rec, httptest.NewRequest("GET", "/", nil), errors.New("pq: password authentication failed for user wallet"))
+	utils.SendError(rec, httptest.NewRequest("GET", "/", nil), errors.New("pq: password authentication failed for user wallet"))
 	if rec.Code != http.StatusInternalServerError {
 		t.Fatalf("status = %d, want 500", rec.Code)
 	}
@@ -94,23 +94,23 @@ func TestWriteError_InternalErrorHidesDetails(t *testing.T) {
 	}
 }
 
-func TestWriteInternalError(t *testing.T) {
+func TestSendInternalError(t *testing.T) {
 	rec := httptest.NewRecorder()
-	utils.WriteInternalError(rec)
+	utils.SendInternalError(rec)
 	if rec.Code != 500 || decodeError(t, rec).Code != domain.CodeInternal {
 		t.Fatalf("got %d %s", rec.Code, rec.Body)
 	}
 }
 
-func TestWriteIdempotent(t *testing.T) {
+func TestSendIdempotent(t *testing.T) {
 	rec := httptest.NewRecorder()
-	utils.WriteIdempotent(rec, false, map[string]string{"id": "1"})
+	utils.SendIdempotent(rec, false, map[string]string{"id": "1"})
 	if rec.Code != http.StatusCreated || rec.Header().Get("Idempotent-Replayed") != "" {
 		t.Fatalf("fresh: %d header=%q", rec.Code, rec.Header().Get("Idempotent-Replayed"))
 	}
 
 	rec = httptest.NewRecorder()
-	utils.WriteIdempotent(rec, true, map[string]string{"id": "1"})
+	utils.SendIdempotent(rec, true, map[string]string{"id": "1"})
 	if rec.Code != http.StatusCreated || rec.Header().Get("Idempotent-Replayed") != "true" {
 		t.Fatalf("replay: %d header=%q", rec.Code, rec.Header().Get("Idempotent-Replayed"))
 	}
