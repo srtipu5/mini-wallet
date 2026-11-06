@@ -2,8 +2,6 @@ package domain
 
 import "time"
 
-const CurrencyBDT = "BDT"
-
 // Transaction types shown in the wallet history.
 const (
 	TxAddMoney    = "ADD_MONEY"

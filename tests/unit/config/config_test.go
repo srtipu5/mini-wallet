@@ -1,6 +1,7 @@
 package config_test
 
 import (
+	"os"
 	"testing"
 
 	"github.com/srtipu5/mini-wallet/internal/config"
@@ -17,6 +18,17 @@ func TestLoad_Defaults(t *testing.T) {
 	if cfg.ReadHeaderTimeout <= 0 || cfg.ReadTimeout <= 0 || cfg.WriteTimeout <= 0 ||
 		cfg.IdleTimeout <= 0 || cfg.ShutdownTimeout <= 0 {
 		t.Fatalf("all timeouts must be set: %+v", cfg)
+	}
+}
+
+func TestLoad_UnsetUsesDefaults(t *testing.T) {
+	t.Setenv("DATABASE_URL", "x") // registers cleanup that restores the original value
+	t.Setenv("PORT", "x")
+	os.Unsetenv("DATABASE_URL")
+	os.Unsetenv("PORT")
+
+	if cfg := config.Load(); cfg.Port != "8080" || cfg.DatabaseURL == "" {
+		t.Fatalf("unset variables must fall back to defaults: %+v", cfg)
 	}
 }
 

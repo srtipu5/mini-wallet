@@ -212,7 +212,7 @@ infrastructure (Postgres)  ──implements──►  service ports
 
 The business logic in `service` never imports HTTP or a database driver. It
 talks to the database only through the interfaces in `service/ports.go`,
-which `infrastructure/repository` implements.
+which `infrastructure/postgres/repository` implements.
 
 ```
 cmd/api/main.go                      entry point: load config, connect DB, run migrations, wire layers, graceful shutdown
@@ -228,13 +228,14 @@ internal/
     routes/                          every route in one place + middleware chain
     handler/                         one *_handler.go per resource
     middleware/                      panic recovery, request logging
-  infrastructure/
-    postgres/                        connection pool and migration runner
-    repository/                      PostgreSQL implementation of the ports (all SQL)
-      store.go                         Store: pool access and WithinTx
-      *_repository.go                  one file per table
+  infrastructure/                    one folder per external technology
+    postgres/
+      connection.go                    connection pool and migration runner
+      repository/                      PostgreSQL implementation of the ports (all SQL)
+        store.go                         Store: pool access and WithinTx
+        *_repository.go                  one file per table
   config/                            settings from environment variables (DATABASE_URL, PORT, timeouts)
-  utils/                             shared helpers: JSON decoding, responses/errors, query params, env
+  utils/                             shared HTTP helpers: JSON decoding, responses/errors, query params
 migrations/                          SQL schema (embedded into the binary)
 tests/                               all tests: unit/ (per layer, no DB) and integration/ (real Postgres)
 ```

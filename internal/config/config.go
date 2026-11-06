@@ -2,9 +2,8 @@
 package config
 
 import (
+	"os"
 	"time"
-
-	"github.com/srtipu5/mini-wallet/internal/utils"
 )
 
 type Config struct {
@@ -22,8 +21,8 @@ type Config struct {
 // API starts against the docker-compose Postgres with no configuration.
 func Load() Config {
 	return Config{
-		DatabaseURL: utils.Getenv("DATABASE_URL", "postgres://wallet:wallet@localhost:5432/wallet?sslmode=disable"),
-		Port:        utils.Getenv("PORT", "8080"),
+		DatabaseURL: getenv("DATABASE_URL", "postgres://wallet:wallet@localhost:5432/wallet?sslmode=disable"),
+		Port:        getenv("PORT", "8080"),
 
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       10 * time.Second,
@@ -31,4 +30,12 @@ func Load() Config {
 		IdleTimeout:       60 * time.Second,
 		ShutdownTimeout:   15 * time.Second,
 	}
+}
+
+// getenv returns the environment variable key, or fallback if it is unset or empty.
+func getenv(key, fallback string) string {
+	if v := os.Getenv(key); v != "" {
+		return v
+	}
+	return fallback
 }

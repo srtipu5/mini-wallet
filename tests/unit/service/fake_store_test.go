@@ -130,7 +130,7 @@ func (r fakeWallets) Create(_ context.Context, userID, phone string) (domain.Wal
 		ID:        fmt.Sprintf("00000000-0000-4000-8000-%012d", r.f.nextWallet),
 		UserID:    userID,
 		Phone:     phone,
-		Currency:  domain.CurrencyBDT,
+		Currency:  "BDT",
 		CreatedAt: fixedNow,
 	}
 	r.f.wallets[w.ID] = w

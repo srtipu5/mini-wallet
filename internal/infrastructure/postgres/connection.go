@@ -1,4 +1,6 @@
 // Package postgres opens the connection pool and applies migrations.
+// The SQL implementation of the service ports lives in ./repository.
+// Another database would get its own sibling package (e.g. ../mongodb).
 package postgres
 
 import (

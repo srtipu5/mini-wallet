@@ -28,7 +28,7 @@ passes, and `make test` passes.
 
 ```
 delivery/http (routes → handler)  ──►  service  ──►  domain
-infrastructure/repository  ──implements──►  service ports
+infrastructure/<db>/repository  ──implements──►  service ports
 ```
 
 ### Dependency rule (never break this)
@@ -40,10 +40,10 @@ infrastructure/repository  ──implements──►  service ports
 | `service` | `domain`, `dto` (never HTTP, never `pgx`) |
 | `delivery/http/handler` | `service`, `dto`, `domain`, `utils` |
 | `delivery/http/routes` | `handler`, `middleware`, `service` |
-| `infrastructure/repository` | `service` (ports), `domain`, `pgx` |
+| `infrastructure/postgres/repository` | `service` (ports), `domain`, `pgx` |
 | `delivery/http/middleware` | `utils` |
 | `infrastructure/postgres` | `migrations`, `pgx`, `golang-migrate` |
-| `config` | `utils` |
+| `config` | standard library only |
 | `utils` | `domain` |
 
 Check it with:
@@ -57,10 +57,11 @@ Check it with:
 | HTTP handler | `internal/delivery/http/handler/<resource>_handler.go` (exported method on `Handler`) |
 | Request body / use-case input / output | `internal/dto/<resource>.go` (`XxxRequest`, `XxxInput`) |
 | Business rule or use case | `internal/service/<resource>_service.go` |
-| New repository method | Add it to the interface in `internal/service/ports.go` first, then implement it in `internal/infrastructure/repository/<table>_repository.go` |
-| SQL | Only in `internal/infrastructure/repository` |
+| New repository method | Add it to the interface in `internal/service/ports.go` first, then implement it in `internal/infrastructure/postgres/repository/<table>_repository.go` |
+| SQL | Only in `internal/infrastructure/postgres/repository` |
+| New database / external system | Its own folder per technology: `internal/infrastructure/<tech>/` with `connection.go` and `repository/` implementing the same ports. Only `cmd/api/main.go` chooses which one to wire; `service` never changes |
 | Entity, error code, validation rule | `internal/domain` |
-| Shared HTTP/env helper | `internal/utils` (no business rules) |
+| Shared HTTP helper | `internal/utils` (no business rules) |
 | Setting from env | `internal/config` |
 | Schema change | New numbered pair in `migrations/` (`00000N_name.up.sql` + `.down.sql`); never edit an applied migration |
 

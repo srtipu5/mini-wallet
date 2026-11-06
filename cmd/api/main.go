@@ -12,7 +12,7 @@ import (
 	"github.com/srtipu5/mini-wallet/internal/config"
 	"github.com/srtipu5/mini-wallet/internal/delivery/http/routes"
 	"github.com/srtipu5/mini-wallet/internal/infrastructure/postgres"
-	"github.com/srtipu5/mini-wallet/internal/infrastructure/repository"
+	"github.com/srtipu5/mini-wallet/internal/infrastructure/postgres/repository"
 	"github.com/srtipu5/mini-wallet/internal/service"
 )
 
