@@ -11,6 +11,8 @@ package dto
 import (
 	"encoding/json"
 	"time"
+
+	"github.com/srtipu5/mini-wallet/internal/domain"
 )
 
 // CreateWalletRequest is the body of POST /api/v1/wallets.
@@ -46,4 +48,10 @@ type AddMoneyResult struct {
 	GatewayRef    string    `json:"gateway_ref"`
 	BalanceAfter  int64     `json:"balance_after"`
 	CreatedAt     time.Time `json:"created_at"`
+}
+
+// WalletPage is the response of GET /api/v1/wallets.
+type WalletPage struct {
+	Data       []domain.Wallet `json:"data"`
+	Pagination Pagination      `json:"pagination"`
 }

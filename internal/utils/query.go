@@ -47,3 +47,15 @@ func QueryTime(q url.Values, name string, isUpperBound bool) (*time.Time, error)
 	}
 	return nil, domain.Validation("The " + name + " parameter must be an ISO-8601 date (2026-11-05) or date-time (2026-11-05T10:00:00Z)")
 }
+
+// QueryPage reads the optional page and page_size query parameters used by
+// every list endpoint: page >= 1 (default 1), page_size 1-100 (default 20).
+func QueryPage(q url.Values) (page, pageSize int, err error) {
+	if page, err = QueryInt(q, "page", 1, 1, domain.MaxPage); err != nil {
+		return 0, 0, err
+	}
+	if pageSize, err = QueryInt(q, "page_size", domain.DefaultPageSize, 1, domain.MaxPageSize); err != nil {
+		return 0, 0, err
+	}
+	return page, pageSize, nil
+}

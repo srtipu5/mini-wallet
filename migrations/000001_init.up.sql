@@ -15,6 +15,9 @@ CREATE TABLE wallets (
     CONSTRAINT wallets_balance_non_negative CHECK (balance >= 0)
 );
 
+-- Wallet list (GET /api/v1/wallets): newest first, id breaks ties.
+CREATE INDEX wallets_created_idx ON wallets (created_at DESC, id DESC);
+
 -- Transfers: one row per P2P transfer.
 CREATE TABLE transfers (
     id              UUID        PRIMARY KEY DEFAULT gen_random_uuid(),

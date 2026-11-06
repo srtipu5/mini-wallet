@@ -67,6 +67,7 @@ transfer must be between **100** and **2,500,000** poisha.
 | Method | Path | Notes |
 |---|---|---|
 | `POST` | `/api/v1/wallets` | `{"user_id","phone"}` → **201**. Returns 409 `DUPLICATE_WALLET` if the user or phone already has a wallet |
+| `GET` | `/api/v1/wallets` | **200**, all wallets, newest first. Optional query parameters: `page`, `page_size` |
 | `GET` | `/api/v1/wallets/{wallet_id}` | **200**, the wallet with its current balance |
 | `POST` | `/api/v1/wallets/{wallet_id}/add-money` | Needs an `Idempotency-Key` header. Body `{"amount","gateway_ref"}` → **201** |
 | `POST` | `/api/v1/transfers` | Needs an `Idempotency-Key` header. Body `{"from_wallet_id","to_wallet_id","amount","note"?}` → **201** |
@@ -101,6 +102,44 @@ curl -X POST localhost:8080/api/v1/wallets \
 |---|---|---|
 | The user or phone already has a wallet | 409 | `DUPLICATE_WALLET` |
 | Phone is not like `01711000001` | 400 | `VALIDATION_ERROR` |
+
+#### List wallets
+
+```bash
+curl 'localhost:8080/api/v1/wallets?page=1&page_size=2'
+```
+
+`200 OK`, newest first. Each item is a full wallet with its current balance.
+
+```json
+{
+  "data": [
+    {
+      "wallet_id": "ba877d2e-050e-4a15-b009-bb3cd2fccfcb",
+      "user_id": "u_1003",
+      "phone": "01911000003",
+      "currency": "BDT",
+      "balance": 0,
+      "created_at": "2026-11-06T17:09:26.855552Z"
+    },
+    {
+      "wallet_id": "bc5d47c5-9cd6-4ce5-b6b9-b373e2164ed4",
+      "user_id": "u_1002",
+      "phone": "01811000002",
+      "currency": "BDT",
+      "balance": 50000,
+      "created_at": "2026-11-06T17:09:26.834732Z"
+    }
+  ],
+  "pagination": { "page": 1, "page_size": 2, "total_items": 3, "total_pages": 2 }
+}
+```
+
+- `page` starts at 1 (default 1). `page_size` is 1 to 100 (default 20). Other values
+  return `400 VALIDATION_ERROR`, for example "The page_size parameter must be an
+  integer between 1 and 100."
+- A page past the end returns an empty `data` array, not an error.
+- Pagination works the same way here as in the transaction history.
 
 #### Get a wallet
 

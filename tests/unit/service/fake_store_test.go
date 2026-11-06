@@ -139,6 +139,24 @@ func (r fakeWallets) Create(_ context.Context, userID, phone string) (domain.Wal
 	return w, nil
 }
 
+func (r fakeWallets) List(_ context.Context, page, pageSize int) ([]domain.Wallet, int, error) {
+	all := make([]domain.Wallet, 0, len(r.f.wallets))
+	for _, w := range r.f.wallets {
+		all = append(all, w)
+	}
+	sort.Slice(all, func(i, j int) bool { // newest first, id breaks ties
+		if !all[i].CreatedAt.Equal(all[j].CreatedAt) {
+			return all[i].CreatedAt.After(all[j].CreatedAt)
+		}
+		return all[i].ID > all[j].ID
+	})
+	start := (page - 1) * pageSize
+	if start >= len(all) {
+		return nil, len(all), nil
+	}
+	return all[start:min(start+pageSize, len(all))], len(all), nil
+}
+
 func (r fakeWallets) Get(_ context.Context, id string) (domain.Wallet, error) {
 	r.f.walletGets++
 	w, ok := r.f.wallets[id]

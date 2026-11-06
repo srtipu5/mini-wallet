@@ -26,12 +26,7 @@ func (s *Service) ListTransactions(ctx context.Context, f domain.TransactionFilt
 	}
 
 	return dto.HistoryPage{
-		Data: items,
-		Pagination: dto.Pagination{
-			Page:       f.Page,
-			PageSize:   f.PageSize,
-			TotalItems: total,
-			TotalPages: (total + f.PageSize - 1) / f.PageSize,
-		},
+		Data:       items,
+		Pagination: dto.NewPagination(f.Page, f.PageSize, total),
 	}, nil
 }

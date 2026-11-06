@@ -68,3 +68,19 @@ func TestQueryTime(t *testing.T) {
 		}
 	}
 }
+
+func TestQueryPage(t *testing.T) {
+	page, size, err := utils.QueryPage(url.Values{})
+	if err != nil || page != 1 || size != 20 {
+		t.Fatalf("defaults = %d, %d, %v; want 1, 20, nil", page, size, err)
+	}
+	page, size, err = utils.QueryPage(url.Values{"page": {"4"}, "page_size": {"100"}})
+	if err != nil || page != 4 || size != 100 {
+		t.Fatalf("explicit = %d, %d, %v; want 4, 100, nil", page, size, err)
+	}
+	for _, q := range []url.Values{{"page": {"0"}}, {"page_size": {"101"}}, {"page_size": {"x"}}} {
+		if _, _, err := utils.QueryPage(q); err == nil {
+			t.Errorf("QueryPage(%v) should fail", q)
+		}
+	}
+}

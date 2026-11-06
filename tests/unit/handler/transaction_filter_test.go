@@ -15,19 +15,26 @@ import (
 // recordingStore captures the history filter the handler builds from the
 // query string, so query parsing can be tested through the public router.
 type recordingStore struct {
-	got *domain.TransactionFilter
+	got      *domain.TransactionFilter
+	listPage int // page passed to Wallets.List (0 = not called)
+	listSize int
 }
 
 func (s *recordingStore) Repos() service.Repositories {
-	return service.Repositories{Wallets: anyWallet{}, Transactions: recordingTransactions{s}}
+	return service.Repositories{Wallets: anyWallet{s}, Transactions: recordingTransactions{s}}
 }
 func (s *recordingStore) WithinTx(context.Context, func(service.Repositories) error) error {
 	panic("not used by history")
 }
 func (s *recordingStore) Ping(context.Context) error { return nil }
 
-// anyWallet reports that every wallet exists.
-type anyWallet struct{}
+// anyWallet reports that every wallet exists, and records list calls.
+type anyWallet struct{ s *recordingStore }
+
+func (a anyWallet) List(_ context.Context, page, pageSize int) ([]domain.Wallet, int, error) {
+	a.s.listPage, a.s.listSize = page, pageSize
+	return nil, 0, nil
+}
 
 func (anyWallet) Get(_ context.Context, id string) (domain.Wallet, error) {
 	return domain.Wallet{ID: id}, nil
@@ -108,6 +115,30 @@ func TestTransactionFilter_Invalid(t *testing.T) {
 		f, status := filterFor(t, q)
 		if status != http.StatusBadRequest || f != nil {
 			t.Errorf("%s: status %d, reached repository=%v; want 400 and no query", q, status, f != nil)
+		}
+	}
+}
+
+// listCall sends GET /api/v1/wallets?query and returns the page and page
+// size the handler passed to the repository (0, 0 if it was rejected).
+func listCall(t *testing.T, query string) (page, size, status int) {
+	t.Helper()
+	store := &recordingStore{}
+	rec := httptest.NewRecorder()
+	routes.NewRouter(service.New(store)).ServeHTTP(rec, httptest.NewRequest("GET", "/api/v1/wallets"+query, nil))
+	return store.listPage, store.listSize, rec.Code
+}
+
+func TestListWallets_Pagination(t *testing.T) {
+	if p, s, st := listCall(t, ""); st != http.StatusOK || p != 1 || s != 20 {
+		t.Fatalf("defaults: status %d page %d size %d; want 200, 1, 20", st, p, s)
+	}
+	if p, s, st := listCall(t, "?page=3&page_size=100"); st != http.StatusOK || p != 3 || s != 100 {
+		t.Fatalf("explicit: status %d page %d size %d; want 200, 3, 100", st, p, s)
+	}
+	for _, q := range []string{"?page=0", "?page=x", "?page_size=0", "?page_size=101", "?page_size=abc"} {
+		if p, _, st := listCall(t, q); st != http.StatusBadRequest || p != 0 {
+			t.Errorf("%s: status %d, reached repository=%v; want 400 and no query", q, st, p != 0)
 		}
 	}
 }

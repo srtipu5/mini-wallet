@@ -21,6 +21,7 @@ func NewRouter(svc *service.Service) http.Handler {
 
 	// Wallets
 	mux.HandleFunc("POST /api/v1/wallets", h.CreateWallet)
+	mux.HandleFunc("GET /api/v1/wallets", h.ListWallets)
 	mux.HandleFunc("GET /api/v1/wallets/{wallet_id}", h.GetWallet)
 	mux.HandleFunc("POST /api/v1/wallets/{wallet_id}/add-money", h.AddMoney)
 	mux.HandleFunc("GET /api/v1/wallets/{wallet_id}/transactions", h.ListTransactions)

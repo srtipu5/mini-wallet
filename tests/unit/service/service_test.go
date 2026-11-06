@@ -671,3 +671,43 @@ func TestListTransactions_UnknownWallet(t *testing.T) {
 		expectCode(t, err, domain.CodeWalletNotFound)
 	}
 }
+
+// ---------------------------------------------------------------- Wallet list
+
+func TestListWallets(t *testing.T) {
+	svc, _ := newTestService()
+	var ids []string
+	for i := 0; i < 5; i++ {
+		ids = append(ids, newWallet(t, svc, 0).ID)
+	}
+
+	// 5 wallets, page size 2 -> 3 pages, newest (last created) first.
+	page, err := svc.ListWallets(ctx, 1, 2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(page.Data) != 2 || page.Data[0].ID != ids[4] || page.Data[1].ID != ids[3] {
+		t.Fatalf("page 1 must hold the two newest wallets, got %+v", page.Data)
+	}
+	if page.Pagination != (dto.Pagination{Page: 1, PageSize: 2, TotalItems: 5, TotalPages: 3}) {
+		t.Fatalf("pagination = %+v", page.Pagination)
+	}
+
+	last, _ := svc.ListWallets(ctx, 3, 2)
+	if len(last.Data) != 1 || last.Data[0].ID != ids[0] {
+		t.Fatalf("last page must hold the oldest wallet, got %+v", last.Data)
+	}
+}
+
+func TestListWallets_EmptyIsArrayNotNull(t *testing.T) {
+	svc, _ := newTestService()
+	for _, p := range []int{1, 50} { // no wallets, and a page past the end
+		page, err := svc.ListWallets(ctx, p, 20)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if page.Data == nil || len(page.Data) != 0 || page.Pagination.TotalItems != 0 || page.Pagination.TotalPages != 0 {
+			t.Fatalf("page %d: want empty non-nil list, got %+v", p, page)
+		}
+	}
+}

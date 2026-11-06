@@ -38,10 +38,7 @@ func parseTransactionFilter(q url.Values) (domain.TransactionFilter, error) {
 	}
 
 	var err error
-	if f.Page, err = utils.QueryInt(q, "page", 1, 1, domain.MaxPage); err != nil {
-		return f, err
-	}
-	if f.PageSize, err = utils.QueryInt(q, "page_size", domain.DefaultPageSize, 1, domain.MaxPageSize); err != nil {
+	if f.Page, f.PageSize, err = utils.QueryPage(q); err != nil {
 		return f, err
 	}
 

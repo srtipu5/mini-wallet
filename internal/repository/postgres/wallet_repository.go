@@ -50,6 +50,28 @@ func (r *walletRepository) Get(ctx context.Context, id string) (domain.Wallet, e
 	return w, err
 }
 
+// List returns one page of wallets, newest first. id breaks ties between
+// wallets created at the same moment, so the order is always stable.
+func (r *walletRepository) List(ctx context.Context, page, pageSize int) ([]domain.Wallet, int, error) {
+	var total int
+	if err := r.db.QueryRow(ctx, `SELECT count(*) FROM wallets`).Scan(&total); err != nil {
+		return nil, 0, err
+	}
+
+	rows, err := r.db.Query(ctx,
+		`SELECT `+walletColumns+` FROM wallets
+		 ORDER BY created_at DESC, id DESC
+		 LIMIT $1 OFFSET $2`,
+		pageSize, (page-1)*pageSize)
+	if err != nil {
+		return nil, 0, err
+	}
+	wallets, err := pgx.CollectRows(rows, func(row pgx.CollectableRow) (domain.Wallet, error) {
+		return scanWallet(row)
+	})
+	return wallets, total, err
+}
+
 // LockBalances locks the given wallets and returns their balances by id.
 //
 // ORDER BY id makes Postgres lock the rows in id order. Every transfer locks

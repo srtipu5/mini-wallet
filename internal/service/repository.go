@@ -16,6 +16,8 @@ import (
 type WalletRepository interface {
 	Create(ctx context.Context, userID, phone string) (domain.Wallet, error)
 	Get(ctx context.Context, id string) (domain.Wallet, error)
+	// List returns one page of wallets (newest first) and the total count.
+	List(ctx context.Context, page, pageSize int) ([]domain.Wallet, int, error)
 	// LockBalances locks the given wallets with SELECT ... FOR UPDATE, always
 	// in wallet id order, and returns their balances by id. Wallets that do
 	// not exist are missing from the map. Only meaningful inside

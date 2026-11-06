@@ -23,6 +23,22 @@ func (h *Handler) CreateWallet(w http.ResponseWriter, r *http.Request) {
 	utils.SendData(w, http.StatusCreated, wallet)
 }
 
+// GET /api/v1/wallets?page=&page_size=
+func (h *Handler) ListWallets(w http.ResponseWriter, r *http.Request) {
+	page, pageSize, err := utils.QueryPage(r.URL.Query())
+	if err != nil {
+		utils.SendError(w, r, err)
+		return
+	}
+
+	wallets, err := h.svc.ListWallets(r.Context(), page, pageSize)
+	if err != nil {
+		utils.SendError(w, r, err)
+		return
+	}
+	utils.SendData(w, http.StatusOK, wallets)
+}
+
 // GET /api/v1/wallets/{wallet_id}
 func (h *Handler) GetWallet(w http.ResponseWriter, r *http.Request) {
 	wallet, err := h.svc.GetWallet(r.Context(), r.PathValue("wallet_id"))
