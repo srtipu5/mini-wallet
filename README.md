@@ -481,3 +481,34 @@ tests/
   unit/                    one folder per package, no database needed
   integration/             real HTTP requests against a real PostgreSQL
 ```
+
+## Not built on purpose (possible next steps)
+
+The assignment asks for a small, correct wallet core. I kept the scope to exactly
+that and avoided over-engineering. These are the things I would add in a real
+product, and how:
+
+- **Notifications (SMS or push).** After add money, the wallet owner gets a message.
+  After a transfer, both the sender (money sent) and the receiver (money received)
+  get one. Nobody needs this in real time, so it should run **asynchronously** and
+  never slow down or fail the money request:
+  1. In the **same database transaction** as the money movement, insert an event
+     (`MONEY_ADDED`, `TRANSFER_COMPLETED`) into an `outbox` table. This is the
+     *transactional outbox* pattern: the event exists if and only if the money
+     moved, so no message is lost and no message is sent for a rolled-back transfer.
+  2. A small background publisher reads new outbox rows and sends them to a
+     **message broker** (for example RabbitMQ or Kafka).
+  3. A separate **notification service** consumes the events and sends the SMS. If
+     the SMS provider is down, it retries later. The wallet API is not affected.
+  4. Consumers skip events they have already handled (by event id), because a
+     broker may deliver the same message more than once.
+- **Authentication and authorization.** Only the owner of a wallet should see it or
+  send money from it, for example with JWT tokens and an ownership check in the
+  service layer.
+- **Rate limiting** per user or per IP address, to protect the API from abuse.
+- **Idempotency key clean-up.** A scheduled job that deletes keys older than, say,
+  24 hours.
+- **Daily and monthly limits** per wallet, on top of the per-transaction limit.
+- **Observability.** Metrics (request rate, latency, error rate), tracing, and alerts.
+- **Cursor-based pagination** for very long transaction histories, where `OFFSET`
+  becomes slow.
