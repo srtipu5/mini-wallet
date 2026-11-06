@@ -5,11 +5,12 @@ import (
 	"strings"
 
 	"github.com/srtipu5/mini-wallet/internal/domain"
+	"github.com/srtipu5/mini-wallet/internal/dto"
 )
 
 // Transfer moves money between two wallets. Debit and credit happen in one
 // database transaction, so either both happen or neither does.
-func (s *Service) Transfer(ctx context.Context, idempotencyKey string, in TransferInput) (domain.Transfer, bool, error) {
+func (s *Service) Transfer(ctx context.Context, idempotencyKey string, in dto.TransferInput) (domain.Transfer, bool, error) {
 	in.FromWalletID = strings.ToLower(in.FromWalletID)
 	in.ToWalletID = strings.ToLower(in.ToWalletID)
 	if in.Note != nil && strings.TrimSpace(*in.Note) == "" {
@@ -26,7 +27,7 @@ func (s *Service) Transfer(ctx context.Context, idempotencyKey string, in Transf
 		})
 }
 
-func validateTransfer(in TransferInput) error {
+func validateTransfer(in dto.TransferInput) error {
 	if in.FromWalletID == "" || in.ToWalletID == "" {
 		return domain.Validation("from_wallet_id and to_wallet_id are required")
 	}
@@ -49,7 +50,7 @@ func validateTransfer(in TransferInput) error {
 }
 
 // executeTransfer runs inside the transaction opened by runIdempotent.
-func executeTransfer(ctx context.Context, r Repositories, in TransferInput) (domain.Transfer, error) {
+func executeTransfer(ctx context.Context, r Repositories, in dto.TransferInput) (domain.Transfer, error) {
 	// 1. Lock both wallets, ALWAYS in the same (sorted) order.
 	//    If A->B and B->A run at the same time, both lock the smaller id first,
 	//    so one simply waits for the other instead of deadlocking.

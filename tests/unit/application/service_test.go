@@ -10,6 +10,7 @@ import (
 	"github.com/srtipu5/mini-wallet/internal/domain"
 
 	"github.com/srtipu5/mini-wallet/internal/application"
+	"github.com/srtipu5/mini-wallet/internal/dto"
 )
 
 var ctx = context.Background()
@@ -31,7 +32,7 @@ func newWallet(t *testing.T, svc *application.Service, balance int64) domain.Wal
 		t.Fatal(err)
 	}
 	if balance > 0 {
-		if _, _, err := svc.AddMoney(ctx, fmt.Sprintf("seed-%d", phoneSeq), application.AddMoneyInput{
+		if _, _, err := svc.AddMoney(ctx, fmt.Sprintf("seed-%d", phoneSeq), dto.AddMoneyInput{
 			WalletID: w.ID, Amount: balance, GatewayRef: fmt.Sprintf("GW-seed-%d", phoneSeq),
 		}); err != nil {
 			t.Fatal(err)
@@ -135,7 +136,7 @@ func TestAddMoney(t *testing.T) {
 	svc, f := newTestService()
 	w := newWallet(t, svc, 0)
 
-	res, replayed, err := svc.AddMoney(ctx, "k1", application.AddMoneyInput{WalletID: w.ID, Amount: 50000, GatewayRef: "GW-1"})
+	res, replayed, err := svc.AddMoney(ctx, "k1", dto.AddMoneyInput{WalletID: w.ID, Amount: 50000, GatewayRef: "GW-1"})
 	if err != nil || replayed {
 		t.Fatalf("AddMoney = %v, replayed=%v", err, replayed)
 	}
@@ -161,7 +162,7 @@ func TestAddMoney_AmountBoundaries(t *testing.T) {
 	svc, f := newTestService()
 	w := newWallet(t, svc, 0)
 	for i, amount := range []int64{domain.MinAmount, domain.MaxAmount} {
-		if _, _, err := svc.AddMoney(ctx, fmt.Sprint("k", i), application.AddMoneyInput{
+		if _, _, err := svc.AddMoney(ctx, fmt.Sprint("k", i), dto.AddMoneyInput{
 			WalletID: w.ID, Amount: amount, GatewayRef: fmt.Sprint("GW-", i),
 		}); err != nil {
 			t.Fatalf("amount %d: %v", amount, err)
@@ -175,32 +176,32 @@ func TestAddMoney_AmountBoundaries(t *testing.T) {
 func TestAddMoney_ValidationNeverOpensTransaction(t *testing.T) {
 	cases := []struct {
 		name string
-		in   func(walletID string) application.AddMoneyInput
+		in   func(walletID string) dto.AddMoneyInput
 		code string
 	}{
-		{"malformed wallet id", func(string) application.AddMoneyInput {
-			return application.AddMoneyInput{WalletID: "garbage", Amount: 1000, GatewayRef: "GW"}
+		{"malformed wallet id", func(string) dto.AddMoneyInput {
+			return dto.AddMoneyInput{WalletID: "garbage", Amount: 1000, GatewayRef: "GW"}
 		}, domain.CodeWalletNotFound},
-		{"amount below min", func(id string) application.AddMoneyInput {
-			return application.AddMoneyInput{WalletID: id, Amount: domain.MinAmount - 1, GatewayRef: "GW"}
+		{"amount below min", func(id string) dto.AddMoneyInput {
+			return dto.AddMoneyInput{WalletID: id, Amount: domain.MinAmount - 1, GatewayRef: "GW"}
 		}, domain.CodeInvalidAmount},
-		{"amount above max", func(id string) application.AddMoneyInput {
-			return application.AddMoneyInput{WalletID: id, Amount: domain.MaxAmount + 1, GatewayRef: "GW"}
+		{"amount above max", func(id string) dto.AddMoneyInput {
+			return dto.AddMoneyInput{WalletID: id, Amount: domain.MaxAmount + 1, GatewayRef: "GW"}
 		}, domain.CodeInvalidAmount},
-		{"zero amount", func(id string) application.AddMoneyInput {
-			return application.AddMoneyInput{WalletID: id, Amount: 0, GatewayRef: "GW"}
+		{"zero amount", func(id string) dto.AddMoneyInput {
+			return dto.AddMoneyInput{WalletID: id, Amount: 0, GatewayRef: "GW"}
 		}, domain.CodeInvalidAmount},
-		{"negative amount", func(id string) application.AddMoneyInput {
-			return application.AddMoneyInput{WalletID: id, Amount: -500, GatewayRef: "GW"}
+		{"negative amount", func(id string) dto.AddMoneyInput {
+			return dto.AddMoneyInput{WalletID: id, Amount: -500, GatewayRef: "GW"}
 		}, domain.CodeInvalidAmount},
-		{"missing gateway_ref", func(id string) application.AddMoneyInput {
-			return application.AddMoneyInput{WalletID: id, Amount: 1000}
+		{"missing gateway_ref", func(id string) dto.AddMoneyInput {
+			return dto.AddMoneyInput{WalletID: id, Amount: 1000}
 		}, domain.CodeValidation},
-		{"blank gateway_ref", func(id string) application.AddMoneyInput {
-			return application.AddMoneyInput{WalletID: id, Amount: 1000, GatewayRef: "   "}
+		{"blank gateway_ref", func(id string) dto.AddMoneyInput {
+			return dto.AddMoneyInput{WalletID: id, Amount: 1000, GatewayRef: "   "}
 		}, domain.CodeValidation},
-		{"gateway_ref too long", func(id string) application.AddMoneyInput {
-			return application.AddMoneyInput{WalletID: id, Amount: 1000, GatewayRef: strings.Repeat("g", domain.MaxGatewayRefLength+1)}
+		{"gateway_ref too long", func(id string) dto.AddMoneyInput {
+			return dto.AddMoneyInput{WalletID: id, Amount: 1000, GatewayRef: strings.Repeat("g", domain.MaxGatewayRefLength+1)}
 		}, domain.CodeValidation},
 	}
 	for _, c := range cases {
@@ -218,7 +219,7 @@ func TestAddMoney_ValidationNeverOpensTransaction(t *testing.T) {
 
 func TestAddMoney_UnknownWallet(t *testing.T) {
 	svc, f := newTestService()
-	_, _, err := svc.AddMoney(ctx, "k", application.AddMoneyInput{WalletID: unknownWalletID, Amount: 1000, GatewayRef: "GW"})
+	_, _, err := svc.AddMoney(ctx, "k", dto.AddMoneyInput{WalletID: unknownWalletID, Amount: 1000, GatewayRef: "GW"})
 	expectCode(t, err, domain.CodeWalletNotFound)
 	if len(f.idem) != 0 || len(f.ledger) != 0 {
 		t.Fatal("failed add-money must roll back the key and the ledger")
@@ -230,13 +231,13 @@ func TestAddMoney_DuplicateGatewayRefRollsBack(t *testing.T) {
 	a := newWallet(t, svc, 0)
 	b := newWallet(t, svc, 0)
 
-	if _, _, err := svc.AddMoney(ctx, "k1", application.AddMoneyInput{WalletID: a.ID, Amount: 1000, GatewayRef: "GW-1"}); err != nil {
+	if _, _, err := svc.AddMoney(ctx, "k1", dto.AddMoneyInput{WalletID: a.ID, Amount: 1000, GatewayRef: "GW-1"}); err != nil {
 		t.Fatal(err)
 	}
 	// Same payment again: under a new key, and into another wallet.
-	_, _, err := svc.AddMoney(ctx, "k2", application.AddMoneyInput{WalletID: a.ID, Amount: 1000, GatewayRef: "GW-1"})
+	_, _, err := svc.AddMoney(ctx, "k2", dto.AddMoneyInput{WalletID: a.ID, Amount: 1000, GatewayRef: "GW-1"})
 	expectCode(t, err, domain.CodeDuplicateGatewayRef)
-	_, _, err = svc.AddMoney(ctx, "k3", application.AddMoneyInput{WalletID: b.ID, Amount: 1000, GatewayRef: "GW-1"})
+	_, _, err = svc.AddMoney(ctx, "k3", dto.AddMoneyInput{WalletID: b.ID, Amount: 1000, GatewayRef: "GW-1"})
 	expectCode(t, err, domain.CodeDuplicateGatewayRef)
 
 	// The balance change made before the duplicate was detected is rolled back.
@@ -248,7 +249,7 @@ func TestAddMoney_DuplicateGatewayRefRollsBack(t *testing.T) {
 func TestAddMoney_Idempotency(t *testing.T) {
 	svc, f := newTestService()
 	w := newWallet(t, svc, 0)
-	in := application.AddMoneyInput{WalletID: w.ID, Amount: 1000, GatewayRef: "GW-1"}
+	in := dto.AddMoneyInput{WalletID: w.ID, Amount: 1000, GatewayRef: "GW-1"}
 
 	first, replayed, err := svc.AddMoney(ctx, "same", in)
 	if err != nil || replayed {
@@ -277,16 +278,16 @@ func TestAddMoney_Idempotency(t *testing.T) {
 func TestAddMoney_FailedRequestReleasesKey(t *testing.T) {
 	svc, f := newTestService()
 	w := newWallet(t, svc, 0)
-	if _, _, err := svc.AddMoney(ctx, "k1", application.AddMoneyInput{WalletID: w.ID, Amount: 1000, GatewayRef: "GW-1"}); err != nil {
+	if _, _, err := svc.AddMoney(ctx, "k1", dto.AddMoneyInput{WalletID: w.ID, Amount: 1000, GatewayRef: "GW-1"}); err != nil {
 		t.Fatal(err)
 	}
 
 	// Fails (duplicate gateway_ref), so key k2 is not stored ...
-	_, _, err := svc.AddMoney(ctx, "k2", application.AddMoneyInput{WalletID: w.ID, Amount: 1000, GatewayRef: "GW-1"})
+	_, _, err := svc.AddMoney(ctx, "k2", dto.AddMoneyInput{WalletID: w.ID, Amount: 1000, GatewayRef: "GW-1"})
 	expectCode(t, err, domain.CodeDuplicateGatewayRef)
 
 	// ... and can be used for a different, valid request.
-	if _, replayed, err := svc.AddMoney(ctx, "k2", application.AddMoneyInput{WalletID: w.ID, Amount: 500, GatewayRef: "GW-2"}); err != nil || replayed {
+	if _, replayed, err := svc.AddMoney(ctx, "k2", dto.AddMoneyInput{WalletID: w.ID, Amount: 500, GatewayRef: "GW-2"}); err != nil || replayed {
 		t.Fatalf("retry with released key: %v replayed=%v", err, replayed)
 	}
 	if balance(t, f, w.ID) != 1500 {
@@ -302,7 +303,7 @@ func TestTransfer(t *testing.T) {
 	b := newWallet(t, svc, 0)
 	note := "Lunch"
 
-	tr, replayed, err := svc.Transfer(ctx, "t1", application.TransferInput{FromWalletID: a.ID, ToWalletID: b.ID, Amount: 10000, Note: &note})
+	tr, replayed, err := svc.Transfer(ctx, "t1", dto.TransferInput{FromWalletID: a.ID, ToWalletID: b.ID, Amount: 10000, Note: &note})
 	if err != nil || replayed {
 		t.Fatalf("Transfer = %v replayed=%v", err, replayed)
 	}
@@ -331,7 +332,7 @@ func TestTransfer_WholeBalance(t *testing.T) {
 	svc, f := newTestService()
 	a := newWallet(t, svc, 1000)
 	b := newWallet(t, svc, 0)
-	if _, _, err := svc.Transfer(ctx, "t1", application.TransferInput{FromWalletID: a.ID, ToWalletID: b.ID, Amount: 1000}); err != nil {
+	if _, _, err := svc.Transfer(ctx, "t1", dto.TransferInput{FromWalletID: a.ID, ToWalletID: b.ID, Amount: 1000}); err != nil {
 		t.Fatal(err)
 	}
 	if balance(t, f, a.ID) != 0 || balance(t, f, b.ID) != 1000 {
@@ -344,7 +345,7 @@ func TestTransfer_InsufficientBalance(t *testing.T) {
 	a := newWallet(t, svc, 1000)
 	b := newWallet(t, svc, 0)
 
-	_, _, err := svc.Transfer(ctx, "t1", application.TransferInput{FromWalletID: a.ID, ToWalletID: b.ID, Amount: 1001})
+	_, _, err := svc.Transfer(ctx, "t1", dto.TransferInput{FromWalletID: a.ID, ToWalletID: b.ID, Amount: 1001})
 	expectCode(t, err, domain.CodeInsufficientBalance)
 	if balance(t, f, a.ID) != 1000 || balance(t, f, b.ID) != 0 || len(f.transfers) != 0 {
 		t.Fatal("a rejected transfer must change nothing")
@@ -364,7 +365,7 @@ func TestTransfer_LocksWalletsInSortedOrder(t *testing.T) {
 
 	for i, dir := range [][2]string{{low.ID, high.ID}, {high.ID, low.ID}} {
 		f.locks = nil
-		if _, _, err := svc.Transfer(ctx, fmt.Sprint("t", i), application.TransferInput{FromWalletID: dir[0], ToWalletID: dir[1], Amount: 100}); err != nil {
+		if _, _, err := svc.Transfer(ctx, fmt.Sprint("t", i), dto.TransferInput{FromWalletID: dir[0], ToWalletID: dir[1], Amount: 100}); err != nil {
 			t.Fatal(err)
 		}
 		if fmt.Sprint(f.locks) != fmt.Sprint(want) {
@@ -377,46 +378,46 @@ func TestTransfer_ValidationNeverOpensTransaction(t *testing.T) {
 	long := strings.Repeat("n", domain.MaxNoteLength+1)
 	cases := []struct {
 		name string
-		in   func(a, b string) application.TransferInput
+		in   func(a, b string) dto.TransferInput
 		code string
 		msg  string
 	}{
-		{"missing from", func(_, b string) application.TransferInput {
-			return application.TransferInput{ToWalletID: b, Amount: 1000}
+		{"missing from", func(_, b string) dto.TransferInput {
+			return dto.TransferInput{ToWalletID: b, Amount: 1000}
 		},
 			domain.CodeValidation, ""},
-		{"missing to", func(a, _ string) application.TransferInput {
-			return application.TransferInput{FromWalletID: a, Amount: 1000}
+		{"missing to", func(a, _ string) dto.TransferInput {
+			return dto.TransferInput{FromWalletID: a, Amount: 1000}
 		},
 			domain.CodeValidation, ""},
-		{"same wallet", func(a, _ string) application.TransferInput {
-			return application.TransferInput{FromWalletID: a, ToWalletID: a, Amount: 1000}
+		{"same wallet", func(a, _ string) dto.TransferInput {
+			return dto.TransferInput{FromWalletID: a, ToWalletID: a, Amount: 1000}
 		},
 			domain.CodeSameWalletTransfer, ""},
-		{"same wallet, different case", func(a, _ string) application.TransferInput {
-			return application.TransferInput{FromWalletID: a, ToWalletID: strings.ToUpper(a), Amount: 1000}
+		{"same wallet, different case", func(a, _ string) dto.TransferInput {
+			return dto.TransferInput{FromWalletID: a, ToWalletID: strings.ToUpper(a), Amount: 1000}
 		}, domain.CodeSameWalletTransfer, ""},
-		{"malformed sender", func(_, b string) application.TransferInput {
-			return application.TransferInput{FromWalletID: "x", ToWalletID: b, Amount: 1000}
+		{"malformed sender", func(_, b string) dto.TransferInput {
+			return dto.TransferInput{FromWalletID: "x", ToWalletID: b, Amount: 1000}
 		},
 			domain.CodeWalletNotFound, "sender wallet not found"},
-		{"malformed receiver", func(a, _ string) application.TransferInput {
-			return application.TransferInput{FromWalletID: a, ToWalletID: "x", Amount: 1000}
+		{"malformed receiver", func(a, _ string) dto.TransferInput {
+			return dto.TransferInput{FromWalletID: a, ToWalletID: "x", Amount: 1000}
 		},
 			domain.CodeWalletNotFound, "receiver wallet not found"},
-		{"amount below min", func(a, b string) application.TransferInput {
-			return application.TransferInput{FromWalletID: a, ToWalletID: b, Amount: 99}
+		{"amount below min", func(a, b string) dto.TransferInput {
+			return dto.TransferInput{FromWalletID: a, ToWalletID: b, Amount: 99}
 		},
 			domain.CodeInvalidAmount, ""},
-		{"amount above max", func(a, b string) application.TransferInput {
-			return application.TransferInput{FromWalletID: a, ToWalletID: b, Amount: domain.MaxAmount + 1}
+		{"amount above max", func(a, b string) dto.TransferInput {
+			return dto.TransferInput{FromWalletID: a, ToWalletID: b, Amount: domain.MaxAmount + 1}
 		}, domain.CodeInvalidAmount, ""},
-		{"negative amount", func(a, b string) application.TransferInput {
-			return application.TransferInput{FromWalletID: a, ToWalletID: b, Amount: -100}
+		{"negative amount", func(a, b string) dto.TransferInput {
+			return dto.TransferInput{FromWalletID: a, ToWalletID: b, Amount: -100}
 		},
 			domain.CodeInvalidAmount, ""},
-		{"note too long", func(a, b string) application.TransferInput {
-			return application.TransferInput{FromWalletID: a, ToWalletID: b, Amount: 1000, Note: &long}
+		{"note too long", func(a, b string) dto.TransferInput {
+			return dto.TransferInput{FromWalletID: a, ToWalletID: b, Amount: 1000, Note: &long}
 		}, domain.CodeValidation, ""},
 	}
 	for _, c := range cases {
@@ -442,13 +443,13 @@ func TestTransfer_UnknownWallets(t *testing.T) {
 	svc, f := newTestService()
 	a := newWallet(t, svc, 5000)
 
-	_, _, err := svc.Transfer(ctx, "k1", application.TransferInput{FromWalletID: unknownWalletID, ToWalletID: a.ID, Amount: 1000})
+	_, _, err := svc.Transfer(ctx, "k1", dto.TransferInput{FromWalletID: unknownWalletID, ToWalletID: a.ID, Amount: 1000})
 	expectCode(t, err, domain.CodeWalletNotFound)
 	if e, _ := domain.AsError(err); e.Message != "sender wallet not found" {
 		t.Fatalf("message = %q", e.Message)
 	}
 
-	_, _, err = svc.Transfer(ctx, "k2", application.TransferInput{FromWalletID: a.ID, ToWalletID: unknownWalletID, Amount: 1000})
+	_, _, err = svc.Transfer(ctx, "k2", dto.TransferInput{FromWalletID: a.ID, ToWalletID: unknownWalletID, Amount: 1000})
 	expectCode(t, err, domain.CodeWalletNotFound)
 	if e, _ := domain.AsError(err); e.Message != "receiver wallet not found" {
 		t.Fatalf("message = %q", e.Message)
@@ -465,19 +466,19 @@ func TestTransfer_NoteHandling(t *testing.T) {
 	b := newWallet(t, svc, 0)
 
 	blank := "   "
-	tr, _, err := svc.Transfer(ctx, "k1", application.TransferInput{FromWalletID: a.ID, ToWalletID: b.ID, Amount: 100, Note: &blank})
+	tr, _, err := svc.Transfer(ctx, "k1", dto.TransferInput{FromWalletID: a.ID, ToWalletID: b.ID, Amount: 100, Note: &blank})
 	if err != nil || tr.Note != nil {
 		t.Fatalf("a blank note must be stored as no note: note=%v err=%v", tr.Note, err)
 	}
 
-	tr, _, err = svc.Transfer(ctx, "k2", application.TransferInput{FromWalletID: a.ID, ToWalletID: b.ID, Amount: 100})
+	tr, _, err = svc.Transfer(ctx, "k2", dto.TransferInput{FromWalletID: a.ID, ToWalletID: b.ID, Amount: 100})
 	if err != nil || tr.Note != nil {
 		t.Fatalf("no note: note=%v err=%v", tr.Note, err)
 	}
 
 	// The limit counts characters, not bytes (Bangla letters are 3 bytes each).
 	bangla := strings.Repeat("ট", domain.MaxNoteLength)
-	if _, _, err := svc.Transfer(ctx, "k3", application.TransferInput{FromWalletID: a.ID, ToWalletID: b.ID, Amount: 100, Note: &bangla}); err != nil {
+	if _, _, err := svc.Transfer(ctx, "k3", dto.TransferInput{FromWalletID: a.ID, ToWalletID: b.ID, Amount: 100, Note: &bangla}); err != nil {
 		t.Fatalf("255-character note must be accepted: %v", err)
 	}
 }
@@ -487,7 +488,7 @@ func TestTransfer_CaseInsensitiveIDs(t *testing.T) {
 	a := newWallet(t, svc, 5000)
 	b := newWallet(t, svc, 0)
 
-	tr, _, err := svc.Transfer(ctx, "k", application.TransferInput{
+	tr, _, err := svc.Transfer(ctx, "k", dto.TransferInput{
 		FromWalletID: strings.ToUpper(a.ID), ToWalletID: strings.ToUpper(b.ID), Amount: 1000,
 	})
 	if err != nil {
@@ -506,7 +507,7 @@ func TestTransfer_AtomicRollbackOnFailure(t *testing.T) {
 	ledgerBefore := len(f.ledger)
 
 	f.failInsertType = domain.TxTransferIn // the very last write fails
-	_, _, err := svc.Transfer(ctx, "k", application.TransferInput{FromWalletID: a.ID, ToWalletID: b.ID, Amount: 1000})
+	_, _, err := svc.Transfer(ctx, "k", dto.TransferInput{FromWalletID: a.ID, ToWalletID: b.ID, Amount: 1000})
 	if !errors.Is(err, errInjected) {
 		t.Fatalf("err = %v, want the injected failure", err)
 	}
@@ -523,7 +524,7 @@ func TestTransfer_Idempotency(t *testing.T) {
 	svc, f := newTestService()
 	a := newWallet(t, svc, 5000)
 	b := newWallet(t, svc, 0)
-	in := application.TransferInput{FromWalletID: a.ID, ToWalletID: b.ID, Amount: 1000}
+	in := dto.TransferInput{FromWalletID: a.ID, ToWalletID: b.ID, Amount: 1000}
 
 	first, replayed, err := svc.Transfer(ctx, "same", in)
 	if err != nil || replayed {
@@ -551,10 +552,10 @@ func TestTransfer_KeysAreScopedPerOperation(t *testing.T) {
 	a := newWallet(t, svc, 0)
 	b := newWallet(t, svc, 0)
 
-	if _, _, err := svc.AddMoney(ctx, "shared", application.AddMoneyInput{WalletID: a.ID, Amount: 5000, GatewayRef: "GW-1"}); err != nil {
+	if _, _, err := svc.AddMoney(ctx, "shared", dto.AddMoneyInput{WalletID: a.ID, Amount: 5000, GatewayRef: "GW-1"}); err != nil {
 		t.Fatal(err)
 	}
-	if _, replayed, err := svc.Transfer(ctx, "shared", application.TransferInput{FromWalletID: a.ID, ToWalletID: b.ID, Amount: 1000}); err != nil || replayed {
+	if _, replayed, err := svc.Transfer(ctx, "shared", dto.TransferInput{FromWalletID: a.ID, ToWalletID: b.ID, Amount: 1000}); err != nil || replayed {
 		t.Fatalf("the same key in another operation must run normally: %v replayed=%v", err, replayed)
 	}
 	if balance(t, f, b.ID) != 1000 {
@@ -569,11 +570,11 @@ func TestListTransactions(t *testing.T) {
 	a := newWallet(t, svc, 0)
 	b := newWallet(t, svc, 0)
 	for i := 0; i < 4; i++ {
-		if _, _, err := svc.AddMoney(ctx, fmt.Sprint("k", i), application.AddMoneyInput{WalletID: a.ID, Amount: 1000, GatewayRef: fmt.Sprint("GW-", i)}); err != nil {
+		if _, _, err := svc.AddMoney(ctx, fmt.Sprint("k", i), dto.AddMoneyInput{WalletID: a.ID, Amount: 1000, GatewayRef: fmt.Sprint("GW-", i)}); err != nil {
 			t.Fatal(err)
 		}
 	}
-	if _, _, err := svc.Transfer(ctx, "t", application.TransferInput{FromWalletID: a.ID, ToWalletID: b.ID, Amount: 500}); err != nil {
+	if _, _, err := svc.Transfer(ctx, "t", dto.TransferInput{FromWalletID: a.ID, ToWalletID: b.ID, Amount: 500}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -585,7 +586,7 @@ func TestListTransactions(t *testing.T) {
 	if len(page.Data) != 2 || page.Data[0].Type != domain.TxTransferOut || page.Data[0].ID < page.Data[1].ID {
 		t.Fatalf("page 1 must be newest first: %+v", page.Data)
 	}
-	if page.Pagination != (application.Pagination{Page: 1, PageSize: 2, TotalItems: 5, TotalPages: 3}) {
+	if page.Pagination != (dto.Pagination{Page: 1, PageSize: 2, TotalItems: 5, TotalPages: 3}) {
 		t.Fatalf("pagination = %+v", page.Pagination)
 	}
 

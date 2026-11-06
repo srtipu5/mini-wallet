@@ -3,13 +3,13 @@ package handler
 import (
 	"net/http"
 
-	"github.com/srtipu5/mini-wallet/internal/application"
+	"github.com/srtipu5/mini-wallet/internal/dto"
 	"github.com/srtipu5/mini-wallet/internal/utils"
 )
 
 // POST /api/v1/wallets
-func (h *Handler) createWallet(w http.ResponseWriter, r *http.Request) {
-	var req createWalletRequest
+func (h *Handler) CreateWallet(w http.ResponseWriter, r *http.Request) {
+	var req dto.CreateWalletRequest
 	if err := utils.DecodeJSON(w, r, &req); err != nil {
 		utils.WriteError(w, r, err)
 		return
@@ -24,7 +24,7 @@ func (h *Handler) createWallet(w http.ResponseWriter, r *http.Request) {
 }
 
 // GET /api/v1/wallets/{wallet_id}
-func (h *Handler) getWallet(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) GetWallet(w http.ResponseWriter, r *http.Request) {
 	wallet, err := h.svc.GetWallet(r.Context(), r.PathValue("wallet_id"))
 	if err != nil {
 		utils.WriteError(w, r, err)
@@ -34,14 +34,14 @@ func (h *Handler) getWallet(w http.ResponseWriter, r *http.Request) {
 }
 
 // POST /api/v1/wallets/{wallet_id}/add-money
-func (h *Handler) addMoney(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) AddMoney(w http.ResponseWriter, r *http.Request) {
 	key, err := utils.IdempotencyKey(r)
 	if err != nil {
 		utils.WriteError(w, r, err)
 		return
 	}
 
-	var req addMoneyRequest
+	var req dto.AddMoneyRequest
 	if err := utils.DecodeJSON(w, r, &req); err != nil {
 		utils.WriteError(w, r, err)
 		return
@@ -52,7 +52,7 @@ func (h *Handler) addMoney(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	result, replayed, err := h.svc.AddMoney(r.Context(), key, application.AddMoneyInput{
+	result, replayed, err := h.svc.AddMoney(r.Context(), key, dto.AddMoneyInput{
 		WalletID:   r.PathValue("wallet_id"),
 		Amount:     amount,
 		GatewayRef: req.GatewayRef,

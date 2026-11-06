@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/srtipu5/mini-wallet/internal/application"
-	"github.com/srtipu5/mini-wallet/internal/delivery/http/handler"
+	"github.com/srtipu5/mini-wallet/internal/delivery/http/routes"
 	"github.com/srtipu5/mini-wallet/internal/domain"
 )
 
@@ -53,7 +53,7 @@ func filterFor(t *testing.T, query string) (*domain.TransactionFilter, int) {
 	t.Helper()
 	store := &recordingStore{}
 	rec := httptest.NewRecorder()
-	handler.NewRouter(application.NewService(store)).ServeHTTP(rec, httptest.NewRequest("GET", historyURL+query, nil))
+	routes.NewRouter(application.NewService(store)).ServeHTTP(rec, httptest.NewRequest("GET", historyURL+query, nil))
 	return store.got, rec.Code
 }
 

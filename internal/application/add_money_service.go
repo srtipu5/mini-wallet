@@ -5,10 +5,11 @@ import (
 	"strings"
 
 	"github.com/srtipu5/mini-wallet/internal/domain"
+	"github.com/srtipu5/mini-wallet/internal/dto"
 )
 
 // AddMoney credits a wallet after a (simulated) payment-gateway confirmation.
-func (s *Service) AddMoney(ctx context.Context, idempotencyKey string, in AddMoneyInput) (domain.AddMoneyResult, bool, error) {
+func (s *Service) AddMoney(ctx context.Context, idempotencyKey string, in dto.AddMoneyInput) (domain.AddMoneyResult, bool, error) {
 	in.WalletID = strings.ToLower(in.WalletID)
 
 	if !domain.IsValidWalletID(in.WalletID) {

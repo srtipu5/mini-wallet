@@ -17,7 +17,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/srtipu5/mini-wallet/internal/application"
-	"github.com/srtipu5/mini-wallet/internal/delivery/http/handler"
+	"github.com/srtipu5/mini-wallet/internal/delivery/http/routes"
 	"github.com/srtipu5/mini-wallet/internal/infrastructure/postgres"
 	"github.com/srtipu5/mini-wallet/internal/infrastructure/repository"
 )
@@ -45,7 +45,7 @@ func TestMain(m *testing.M) {
 		os.Exit(1)
 	}
 
-	server = httptest.NewServer(handler.NewRouter(application.NewService(repository.NewStore(db))))
+	server = httptest.NewServer(routes.NewRouter(application.NewService(repository.NewStore(db))))
 	code := m.Run()
 	server.Close()
 	db.Close()

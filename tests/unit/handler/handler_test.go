@@ -11,7 +11,7 @@ import (
 
 	"github.com/srtipu5/mini-wallet/internal/application"
 
-	"github.com/srtipu5/mini-wallet/internal/delivery/http/handler"
+	"github.com/srtipu5/mini-wallet/internal/delivery/http/routes"
 )
 
 // stubStore lets the router run without a database. Its repositories are
@@ -32,7 +32,7 @@ func serve(t *testing.T, store application.Store, method, path, body string, hea
 		req.Header.Set(k, v)
 	}
 	rec := httptest.NewRecorder()
-	handler.NewRouter(application.NewService(store)).ServeHTTP(rec, req)
+	routes.NewRouter(application.NewService(store)).ServeHTTP(rec, req)
 	return rec
 }
 

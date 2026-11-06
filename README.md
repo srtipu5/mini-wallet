@@ -218,16 +218,15 @@ which `infrastructure/repository` implements.
 cmd/api/main.go                      entry point: load config, connect DB, run migrations, wire layers, graceful shutdown
 internal/
   domain/                            entities, error codes, validation rules (no dependencies)
+  dto/                               data shapes crossing layers, one file per resource:
+                                       HTTP request bodies, use-case inputs, history page
   application/                       use cases (business logic)
     ports.go                           interfaces the use cases need: repositories + Store (transactions)
-    dto.go                             use-case inputs and outputs
     *_service.go                       wallet, add money, transfer, transaction history
     idempotency.go                     exactly-once execution for add money and transfers
   delivery/http/                     HTTP layer
-    handler/
-      routes.go                        every route in one place
-      dto.go                           request bodies
-      *_handler.go                     one file per resource
+    routes/                          every route in one place + middleware chain
+    handler/                         one *_handler.go per resource
     middleware/                      panic recovery, request logging
   infrastructure/
     postgres/                        connection pool and migration runner

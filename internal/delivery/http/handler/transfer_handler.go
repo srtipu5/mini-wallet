@@ -3,19 +3,19 @@ package handler
 import (
 	"net/http"
 
-	"github.com/srtipu5/mini-wallet/internal/application"
+	"github.com/srtipu5/mini-wallet/internal/dto"
 	"github.com/srtipu5/mini-wallet/internal/utils"
 )
 
 // POST /api/v1/transfers
-func (h *Handler) transfer(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) Transfer(w http.ResponseWriter, r *http.Request) {
 	key, err := utils.IdempotencyKey(r)
 	if err != nil {
 		utils.WriteError(w, r, err)
 		return
 	}
 
-	var req transferRequest
+	var req dto.TransferRequest
 	if err := utils.DecodeJSON(w, r, &req); err != nil {
 		utils.WriteError(w, r, err)
 		return
@@ -26,7 +26,7 @@ func (h *Handler) transfer(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	transfer, replayed, err := h.svc.Transfer(r.Context(), key, application.TransferInput{
+	transfer, replayed, err := h.svc.Transfer(r.Context(), key, dto.TransferInput{
 		FromWalletID: req.FromWalletID,
 		ToWalletID:   req.ToWalletID,
 		Amount:       amount,

@@ -11,7 +11,7 @@ import (
 
 	"github.com/srtipu5/mini-wallet/internal/application"
 	"github.com/srtipu5/mini-wallet/internal/config"
-	"github.com/srtipu5/mini-wallet/internal/delivery/http/handler"
+	"github.com/srtipu5/mini-wallet/internal/delivery/http/routes"
 	"github.com/srtipu5/mini-wallet/internal/infrastructure/postgres"
 	"github.com/srtipu5/mini-wallet/internal/infrastructure/repository"
 )
@@ -45,7 +45,7 @@ func run() error {
 	// Wire the layers: repository (Postgres) -> application (use cases) -> handler (HTTP).
 	store := repository.NewStore(pool)
 	service := application.NewService(store)
-	router := handler.NewRouter(service)
+	router := routes.NewRouter(service)
 
 	server := &http.Server{
 		Addr:              ":" + cfg.Port,

@@ -10,7 +10,7 @@ import (
 )
 
 // GET /api/v1/wallets/{wallet_id}/transactions?type=&from=&to=&page=&page_size=
-func (h *Handler) listTransactions(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) ListTransactions(w http.ResponseWriter, r *http.Request) {
 	filter, err := parseTransactionFilter(r.URL.Query())
 	if err != nil {
 		utils.WriteError(w, r, err)

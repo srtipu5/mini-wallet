@@ -1,10 +1,7 @@
 // Package handler is the HTTP delivery layer: parse the request, call the
 // application service, write the response. No business rules live here.
-//
-//	routes.go               every route in one place
-//	dto.go                  request bodies
-//	*_handler.go            one file per resource
-//	internal/utils          shared JSON / query / response helpers
+// One file per resource; routes are registered in ../routes, request bodies
+// live in internal/dto, and shared helpers in internal/utils.
 package handler
 
 import "github.com/srtipu5/mini-wallet/internal/application"
