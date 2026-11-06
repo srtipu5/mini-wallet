@@ -29,30 +29,189 @@ transfer must be between **100** and **2,500,000** poisha.
 | `GET` | `/api/v1/wallets/{wallet_id}/transactions` | **200**. Optional query parameters: `type`, `from`, `to`, `page`, `page_size` |
 | `GET` | `/health` | Checks that the database is reachable |
 
-Example:
+### Examples
+
+Real requests and responses from a fresh database. Wallet A is `56055a57…` and
+wallet B is `971c93db…`; replace the ids with your own when you try them.
+
+#### Create a wallet
 
 ```bash
-curl -X POST localhost:8080/api/v1/wallets -d '{"user_id":"u_1001","phone":"01711000001"}'
-
-curl -X POST localhost:8080/api/v1/wallets/<wallet_id>/add-money \
-  -H 'Idempotency-Key: 6f1c...' -d '{"amount":50000,"gateway_ref":"GW-20261105-9981"}'
-
-curl -X POST localhost:8080/api/v1/transfers -H 'Idempotency-Key: 9a2e...' \
-  -d '{"from_wallet_id":"<a>","to_wallet_id":"<b>","amount":10000,"note":"Lunch"}'
-
-curl 'localhost:8080/api/v1/wallets/<wallet_id>/transactions?type=TRANSFER_OUT&from=2026-11-01&to=2026-11-07&page=1&page_size=20'
+curl -X POST localhost:8080/api/v1/wallets \
+  -d '{"user_id":"u_1001","phone":"01711000001"}'
 ```
 
-The history response looks like this:
+`201 Created`
+
+```json
+{
+  "wallet_id": "56055a57-787f-49e0-bd63-0185b9bc131d",
+  "user_id": "u_1001",
+  "phone": "01711000001",
+  "currency": "BDT",
+  "balance": 0,
+  "created_at": "2026-11-06T16:01:36.220424Z"
+}
+```
+
+| Case | Status | Error code |
+|---|---|---|
+| The user or phone already has a wallet | 409 | `DUPLICATE_WALLET` |
+| Phone is not like `01711000001` | 400 | `VALIDATION_ERROR` |
+
+#### Get a wallet
+
+```bash
+curl localhost:8080/api/v1/wallets/56055a57-787f-49e0-bd63-0185b9bc131d
+```
+
+`200 OK` (after the add-money and transfer below)
+
+```json
+{
+  "wallet_id": "56055a57-787f-49e0-bd63-0185b9bc131d",
+  "user_id": "u_1001",
+  "phone": "01711000001",
+  "currency": "BDT",
+  "balance": 40000,
+  "created_at": "2026-11-06T16:01:36.220424Z"
+}
+```
+
+An unknown or malformed id returns `404 WALLET_NOT_FOUND`.
+
+#### Add money
+
+```bash
+curl -X POST localhost:8080/api/v1/wallets/56055a57-787f-49e0-bd63-0185b9bc131d/add-money \
+  -H 'Idempotency-Key: am-1' \
+  -d '{"amount":50000,"gateway_ref":"GW-20261105-9981"}'
+```
+
+`201 Created`
+
+```json
+{
+  "transaction_id": 1,
+  "wallet_id": "56055a57-787f-49e0-bd63-0185b9bc131d",
+  "amount": 50000,
+  "gateway_ref": "GW-20261105-9981",
+  "balance_after": 50000,
+  "created_at": "2026-11-06T16:01:36.373699Z"
+}
+```
+
+Sending the exact same request again returns the same `201` and the same body,
+with the header `Idempotent-Replayed: true`. The wallet is not credited twice.
+
+| Case | Status | Error code |
+|---|---|---|
+| Same `Idempotency-Key`, different body | 422 | `IDEMPOTENCY_KEY_REUSED` |
+| Same `gateway_ref` under a new key (or another wallet) | 409 | `DUPLICATE_GATEWAY_REF` |
+| `"amount": 100.5`, `1e3` or `"500"` | 400 | `INVALID_AMOUNT` |
+| `"amount": 99` or more than `2500000` | 400 | `INVALID_AMOUNT` |
+| No `Idempotency-Key` header | 400 | `MISSING_IDEMPOTENCY_KEY` |
+
+#### Transfer money
+
+```bash
+curl -X POST localhost:8080/api/v1/transfers \
+  -H 'Idempotency-Key: tr-1' \
+  -d '{"from_wallet_id":"56055a57-787f-49e0-bd63-0185b9bc131d",
+       "to_wallet_id":"971c93db-dd20-4571-801d-433fb86456e3",
+       "amount":10000,"note":"Lunch"}'
+```
+
+`201 Created`
+
+```json
+{
+  "transfer_id": "b8a4d6ee-17fb-4a6a-bdb4-3e8c7ea8e426",
+  "from_wallet_id": "56055a57-787f-49e0-bd63-0185b9bc131d",
+  "to_wallet_id": "971c93db-dd20-4571-801d-433fb86456e3",
+  "amount": 10000,
+  "note": "Lunch",
+  "status": "COMPLETED",
+  "created_at": "2026-11-06T16:01:36.606424Z"
+}
+```
+
+| Case | Status | Error code |
+|---|---|---|
+| Sender's balance is too low | 422 | `INSUFFICIENT_BALANCE` |
+| `from_wallet_id` equals `to_wallet_id` | 400 | `SAME_WALLET_TRANSFER` |
+| Sender or receiver does not exist | 404 | `WALLET_NOT_FOUND` (message says which one) |
+| Same `Idempotency-Key`, different body | 422 | `IDEMPOTENCY_KEY_REUSED` |
+| No `Idempotency-Key` header | 400 | `MISSING_IDEMPOTENCY_KEY` |
+
+#### Transaction history
+
+```bash
+curl localhost:8080/api/v1/wallets/56055a57-787f-49e0-bd63-0185b9bc131d/transactions
+```
+
+`200 OK`, newest first
 
 ```json
 {
   "data": [
-    {"transaction_id": 2, "type": "TRANSFER_OUT", "amount": 10000, "balance_after": 40000,
-     "counterparty_wallet_id": "<b>", "reference_id": "<transfer_id>", "created_at": "..."}
+    {
+      "transaction_id": 3,
+      "type": "TRANSFER_OUT",
+      "amount": 10000,
+      "balance_after": 40000,
+      "counterparty_wallet_id": "971c93db-dd20-4571-801d-433fb86456e3",
+      "reference_id": "b8a4d6ee-17fb-4a6a-bdb4-3e8c7ea8e426",
+      "created_at": "2026-11-06T16:01:36.606424Z"
+    },
+    {
+      "transaction_id": 1,
+      "type": "ADD_MONEY",
+      "amount": 50000,
+      "balance_after": 50000,
+      "counterparty_wallet_id": null,
+      "reference_id": "GW-20261105-9981",
+      "created_at": "2026-11-06T16:01:36.373699Z"
+    }
   ],
-  "pagination": {"page": 1, "page_size": 20, "total_items": 1, "total_pages": 1}
+  "pagination": { "page": 1, "page_size": 20, "total_items": 2, "total_pages": 1 }
 }
+```
+
+With filters, wallet B sees the same transfer as `TRANSFER_IN`:
+
+```bash
+curl 'localhost:8080/api/v1/wallets/971c93db-dd20-4571-801d-433fb86456e3/transactions?type=TRANSFER_IN&from=2026-11-01&to=2026-11-30&page=1&page_size=20'
+```
+
+```json
+{
+  "data": [
+    {
+      "transaction_id": 4,
+      "type": "TRANSFER_IN",
+      "amount": 10000,
+      "balance_after": 10000,
+      "counterparty_wallet_id": "56055a57-787f-49e0-bd63-0185b9bc131d",
+      "reference_id": "b8a4d6ee-17fb-4a6a-bdb4-3e8c7ea8e426",
+      "created_at": "2026-11-06T16:01:36.606424Z"
+    }
+  ],
+  "pagination": { "page": 1, "page_size": 20, "total_items": 1, "total_pages": 1 }
+}
+```
+
+- `ADD_MONEY` uses the `gateway_ref` as `reference_id`; transfers use the `transfer_id`.
+- `transaction_id` can have gaps (here there is no 2). A rolled-back attempt, such as
+  a rejected duplicate `gateway_ref`, still uses up a sequence number. Ids show order,
+  not a continuous count.
+- A bad filter, for example `?page_size=500`, returns `400 VALIDATION_ERROR`.
+
+#### Health and unknown routes
+
+```bash
+curl localhost:8080/health          # 200 {"status":"ok"}
+curl localhost:8080/api/v1/nope     # 404 {"error":{"code":"NOT_FOUND","message":"route not found"}}
 ```
 
 ### Errors
