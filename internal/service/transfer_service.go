@@ -8,8 +8,16 @@ import (
 	"github.com/srtipu5/mini-wallet/internal/dto"
 )
 
-// Transfer moves money between two wallets. Debit and credit happen in one
-// database transaction, so either both happen or neither does.
+// Transfer moves money from one wallet to another.
+//
+// Validation runs first, outside the database. Everything else runs inside
+// ONE database transaction (opened by runIdempotent):
+//
+//	BEGIN
+//	  claim the Idempotency-Key            (runIdempotent)
+//	  lock both wallets, check, move money (transferInTx)
+//	  save the response for the key        (runIdempotent)
+//	COMMIT    -- or ROLLBACK if any step returns an error
 func (s *Service) Transfer(ctx context.Context, idempotencyKey string, in dto.TransferInput) (domain.Transfer, bool, error) {
 	in.FromWalletID = strings.ToLower(in.FromWalletID)
 	in.ToWalletID = strings.ToLower(in.ToWalletID)
@@ -22,8 +30,8 @@ func (s *Service) Transfer(ctx context.Context, idempotencyKey string, in dto.Tr
 	}
 
 	return runIdempotent(ctx, s.store, scopeTransfer, idempotencyKey, in,
-		func(r Repositories) (domain.Transfer, error) {
-			return executeTransfer(ctx, r, in)
+		func(tx Repositories) (domain.Transfer, error) {
+			return transferInTx(ctx, tx, in)
 		})
 }
 
@@ -49,55 +57,71 @@ func validateTransfer(in dto.TransferInput) error {
 	return nil
 }
 
-// executeTransfer runs inside the transaction opened by runIdempotent.
-func executeTransfer(ctx context.Context, r Repositories, in dto.TransferInput) (domain.Transfer, error) {
-	// 1. Lock both wallets in ONE query. The repository locks them in wallet
-	//    id order (ORDER BY id ... FOR UPDATE), which prevents deadlocks.
-	balances, err := r.Wallets.LockBalances(ctx, in.FromWalletID, in.ToWalletID)
+// transferInTx does the money movement. Every call on tx runs inside the same
+// database transaction, so returning an error from any step rolls back all
+// the steps before it: a debit is never saved without its credit.
+func transferInTx(ctx context.Context, tx Repositories, in dto.TransferInput) (domain.Transfer, error) {
+	// Step 1: lock both wallets.
+	// SELECT ... WHERE id = ANY(...) ORDER BY id FOR UPDATE
+	// Locking in wallet id order prevents deadlocks. Other transfers touching
+	// these wallets now wait until we COMMIT or ROLLBACK.
+	balances, err := tx.Wallets.LockBalances(ctx, in.FromWalletID, in.ToWalletID)
 	if err != nil {
 		return domain.Transfer{}, err
 	}
-	if _, ok := balances[in.FromWalletID]; !ok {
+	senderBalance, senderFound := balances[in.FromWalletID]
+	if !senderFound {
 		return domain.Transfer{}, domain.NewError(domain.CodeWalletNotFound, "Sender wallet not found")
 	}
-	if _, ok := balances[in.ToWalletID]; !ok {
+	if _, receiverFound := balances[in.ToWalletID]; !receiverFound {
 		return domain.Transfer{}, domain.NewError(domain.CodeWalletNotFound, "Receiver wallet not found")
 	}
 
-	// 2. Check the balance. Safe because nobody else can change it while we hold the lock.
-	if balances[in.FromWalletID] < in.Amount {
+	// Step 2: check the balance. Safe, because the lock stops anyone else
+	// from changing it until we finish.
+	if senderBalance < in.Amount {
 		return domain.Transfer{}, domain.ErrInsufficientBalance
 	}
 
-	// 3. Debit and credit.
-	fromBalance, err := r.Wallets.ChangeBalance(ctx, in.FromWalletID, -in.Amount)
+	// Step 3: debit the sender and credit the receiver.
+	// UPDATE wallets SET balance = balance - amount / + amount
+	senderBalanceAfter, err := tx.Wallets.ChangeBalance(ctx, in.FromWalletID, -in.Amount)
 	if err != nil {
 		return domain.Transfer{}, err
 	}
-	toBalance, err := r.Wallets.ChangeBalance(ctx, in.ToWalletID, in.Amount)
-	if err != nil {
-		return domain.Transfer{}, err
-	}
-
-	// 4. Record the transfer and one ledger entry per wallet.
-	transfer, err := r.Transfers.Insert(ctx, in.FromWalletID, in.ToWalletID, in.Amount, in.Note)
+	receiverBalanceAfter, err := tx.Wallets.ChangeBalance(ctx, in.ToWalletID, in.Amount)
 	if err != nil {
 		return domain.Transfer{}, err
 	}
 
-	out := domain.Transaction{
-		Type: domain.TxTransferOut, Amount: in.Amount, BalanceAfter: fromBalance,
-		CounterpartyWalletID: &in.ToWalletID, ReferenceID: transfer.ID,
-	}
-	if err := r.Transactions.Insert(ctx, in.FromWalletID, &out); err != nil {
+	// Step 4: record the transfer.
+	// INSERT INTO transfers
+	transfer, err := tx.Transfers.Insert(ctx, in.FromWalletID, in.ToWalletID, in.Amount, in.Note)
+	if err != nil {
 		return domain.Transfer{}, err
 	}
 
-	inEntry := domain.Transaction{
-		Type: domain.TxTransferIn, Amount: in.Amount, BalanceAfter: toBalance,
-		CounterpartyWalletID: &in.FromWalletID, ReferenceID: transfer.ID,
+	// Step 5: one ledger entry per wallet, shown in each wallet's history.
+	// INSERT INTO transactions (TRANSFER_OUT for the sender, TRANSFER_IN for the receiver)
+	sent := domain.Transaction{
+		Type:                 domain.TxTransferOut,
+		Amount:               in.Amount,
+		BalanceAfter:         senderBalanceAfter,
+		CounterpartyWalletID: &in.ToWalletID,
+		ReferenceID:          transfer.ID,
 	}
-	if err := r.Transactions.Insert(ctx, in.ToWalletID, &inEntry); err != nil {
+	if err := tx.Transactions.Insert(ctx, in.FromWalletID, &sent); err != nil {
+		return domain.Transfer{}, err
+	}
+
+	received := domain.Transaction{
+		Type:                 domain.TxTransferIn,
+		Amount:               in.Amount,
+		BalanceAfter:         receiverBalanceAfter,
+		CounterpartyWalletID: &in.FromWalletID,
+		ReferenceID:          transfer.ID,
+	}
+	if err := tx.Transactions.Insert(ctx, in.ToWalletID, &received); err != nil {
 		return domain.Transfer{}, err
 	}
 

@@ -61,7 +61,7 @@ type Store interface {
 	Repos() Repositories
 	// WithinTx runs fn inside one database transaction. If fn returns an
 	// error, everything is rolled back; otherwise it is committed.
-	WithinTx(ctx context.Context, fn func(r Repositories) error) error
+	WithinTx(ctx context.Context, fn func(tx Repositories) error) error
 	// Ping checks that the database is reachable.
 	Ping(ctx context.Context) error
 }

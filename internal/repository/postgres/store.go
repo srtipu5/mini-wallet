@@ -24,8 +24,13 @@ func (s *Store) Repos() service.Repositories {
 	return newRepositories(s.pool)
 }
 
-// WithinTx commits if fn returns nil and rolls back otherwise.
-func (s *Store) WithinTx(ctx context.Context, fn func(r service.Repositories) error) error {
+// WithinTx runs fn inside one database transaction:
+//
+//	BEGIN
+//	  fn(tx)   -- every repository passed to fn uses this same transaction
+//	COMMIT     -- if fn returns nil
+//	ROLLBACK   -- if fn returns an error (or panics)
+func (s *Store) WithinTx(ctx context.Context, fn func(tx service.Repositories) error) error {
 	return pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
 		return fn(newRepositories(tx))
 	})
