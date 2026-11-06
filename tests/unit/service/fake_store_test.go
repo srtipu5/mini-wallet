@@ -28,8 +28,10 @@ type fakeStore struct {
 	walletGets int        // number of Wallets.Get calls
 
 	// Fault injection.
-	pingErr        error
-	failInsertType string // Transactions.Insert fails for this entry type
+	pingErr error
+	// failAt makes one step fail: "lock", "debit", "credit", "transfer", or a
+	// ledger entry type ("ADD_MONEY", "TRANSFER_OUT", "TRANSFER_IN").
+	failAt string
 }
 
 type ledgerRow struct {
@@ -148,6 +150,9 @@ func (r fakeWallets) Get(_ context.Context, id string) (domain.Wallet, error) {
 
 func (r fakeWallets) LockBalances(_ context.Context, ids ...string) (map[string]int64, error) {
 	r.f.lockCalls = append(r.f.lockCalls, append([]string(nil), ids...))
+	if r.f.failAt == "lock" {
+		return nil, errInjected
+	}
 	balances := map[string]int64{}
 	for _, id := range ids {
 		if w, ok := r.f.wallets[id]; ok {
@@ -158,6 +163,9 @@ func (r fakeWallets) LockBalances(_ context.Context, ids ...string) (map[string]
 }
 
 func (r fakeWallets) ChangeBalance(_ context.Context, id string, delta int64) (int64, error) {
+	if (delta < 0 && r.f.failAt == "debit") || (delta > 0 && r.f.failAt == "credit") {
+		return 0, errInjected
+	}
 	w, ok := r.f.wallets[id]
 	if !ok {
 		return 0, domain.ErrWalletNotFound
@@ -175,7 +183,7 @@ func (r fakeWallets) ChangeBalance(_ context.Context, id string, delta int64) (i
 type fakeTransactions struct{ f *fakeStore }
 
 func (r fakeTransactions) Insert(_ context.Context, walletID string, t *domain.Transaction) error {
-	if t.Type == r.f.failInsertType {
+	if t.Type == r.f.failAt {
 		return errInjected
 	}
 	if t.Type == domain.TxAddMoney {
@@ -215,6 +223,9 @@ func (r fakeTransactions) List(_ context.Context, f domain.TransactionFilter) ([
 type fakeTransfers struct{ f *fakeStore }
 
 func (r fakeTransfers) Insert(_ context.Context, fromID, toID string, amount int64, note *string) (domain.Transfer, error) {
+	if r.f.failAt == "transfer" {
+		return domain.Transfer{}, errInjected
+	}
 	r.f.nextTransfer++
 	t := domain.Transfer{
 		ID:           fmt.Sprintf("10000000-0000-4000-8000-%012d", r.f.nextTransfer),

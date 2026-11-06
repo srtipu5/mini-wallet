@@ -504,24 +504,67 @@ func TestTransfer_CaseInsensitiveIDs(t *testing.T) {
 	}
 }
 
-// If any step fails after money has moved, everything is rolled back.
-func TestTransfer_AtomicRollbackOnFailure(t *testing.T) {
+// Debit and credit must be atomic: whichever step fails, nothing is left
+// behind (no half-moved money, no transfer record, no ledger entry, no key).
+func TestTransfer_AtomicRollbackAtEveryStep(t *testing.T) {
+	steps := []string{"lock", "debit", "credit", "transfer", domain.TxTransferOut, domain.TxTransferIn}
+	for _, step := range steps {
+		t.Run(step, func(t *testing.T) {
+			svc, f := newTestService()
+			a := newWallet(t, svc, 5000)
+			b := newWallet(t, svc, 0)
+			ledgerBefore, keysBefore := len(f.ledger), len(f.idem)
+
+			f.failAt = step
+			_, _, err := svc.Transfer(ctx, "k", dto.TransferInput{FromWalletID: a.ID, ToWalletID: b.ID, Amount: 1000})
+			if !errors.Is(err, errInjected) {
+				t.Fatalf("err = %v, want the injected failure", err)
+			}
+			if balance(t, f, a.ID) != 5000 || balance(t, f, b.ID) != 0 {
+				t.Fatalf("balances a=%d b=%d; must be rolled back to 5000 and 0", balance(t, f, a.ID), balance(t, f, b.ID))
+			}
+			if len(f.transfers) != 0 || len(f.ledger) != ledgerBefore || len(f.idem) != keysBefore {
+				t.Fatal("transfer record, ledger entries and idempotency key must be rolled back")
+			}
+
+			// Nothing was used up: the same key works once the fault is gone.
+			f.failAt = ""
+			if _, replayed, err := svc.Transfer(ctx, "k", dto.TransferInput{FromWalletID: a.ID, ToWalletID: b.ID, Amount: 1000}); err != nil || replayed {
+				t.Fatalf("retry after rollback: err=%v replayed=%v", err, replayed)
+			}
+		})
+	}
+}
+
+func TestAddMoney_AtomicRollbackAtEveryStep(t *testing.T) {
+	for _, step := range []string{"credit", domain.TxAddMoney} {
+		t.Run(step, func(t *testing.T) {
+			svc, f := newTestService()
+			w := newWallet(t, svc, 0)
+
+			f.failAt = step
+			_, _, err := svc.AddMoney(ctx, "k", dto.AddMoneyInput{WalletID: w.ID, Amount: 1000, GatewayRef: "GW-1"})
+			if !errors.Is(err, errInjected) {
+				t.Fatalf("err = %v, want the injected failure", err)
+			}
+			if balance(t, f, w.ID) != 0 || len(f.entriesOf(w.ID)) != 0 || len(f.idem) != 0 {
+				t.Fatal("balance, ledger entry and idempotency key must be rolled back")
+			}
+		})
+	}
+}
+
+// When neither wallet exists, the sender is reported.
+func TestTransfer_BothWalletsUnknown(t *testing.T) {
 	svc, f := newTestService()
-	a := newWallet(t, svc, 5000)
-	b := newWallet(t, svc, 0)
-	ledgerBefore := len(f.ledger)
-
-	f.failInsertType = domain.TxTransferIn // the very last write fails
-	_, _, err := svc.Transfer(ctx, "k", dto.TransferInput{FromWalletID: a.ID, ToWalletID: b.ID, Amount: 1000})
-	if !errors.Is(err, errInjected) {
-		t.Fatalf("err = %v, want the injected failure", err)
+	other := "00000000-0000-4000-8000-888888888888"
+	_, _, err := svc.Transfer(ctx, "k", dto.TransferInput{FromWalletID: unknownWalletID, ToWalletID: other, Amount: 1000})
+	expectCode(t, err, domain.CodeWalletNotFound)
+	if e, _ := domain.AsError(err); e.Message != "sender wallet not found" {
+		t.Fatalf("message = %q, want sender wallet not found", e.Message)
 	}
-
-	if balance(t, f, a.ID) != 5000 || balance(t, f, b.ID) != 0 {
-		t.Fatal("debit without credit: balances must be rolled back")
-	}
-	if len(f.transfers) != 0 || len(f.ledger) != ledgerBefore || len(f.idem) != 1 /* seed key only */ {
-		t.Fatal("transfer record, ledger entries and idempotency key must be rolled back")
+	if len(f.idem) != 0 {
+		t.Fatal("a failed transfer must not keep its key")
 	}
 }
 

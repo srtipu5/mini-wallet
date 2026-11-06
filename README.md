@@ -49,15 +49,18 @@ tests/
 - **Unit tests** test each layer through its public API only. The service
   tests use a fake store (`tests/unit/service/fake_store_test.go`) that
   implements the repository interfaces in memory and imitates rollback. They check
-  balance rules, locking both wallets together, rollback when a step fails, and idempotency
-  (replay, reuse, released keys).
+  balance rules, locking both wallets together, full rollback when any step of a
+  transfer or add-money fails, and idempotency (replay, reuse, released keys).
 - **Integration tests** (`tests/integration/`) cover every rule below, including the
   concurrency cases: double-spend races, the same idempotency key sent 20 times at
-  once, opposite transfers A→B and B→A at the same time (no deadlock), the same
-  `gateway_ref` sent under different keys, and mixed concurrent operations that must
-  conserve money and keep every wallet's history consistent with its balance. They
-  use a separate database, `wallet_test`, and skip themselves when
-  `TEST_DATABASE_URL` is not set.
+  once, opposite transfers A→B and B→A and a three-way cycle A→B→C→A at the same
+  time (no deadlock), the same `gateway_ref` sent under different keys, and mixed
+  concurrent operations that must conserve money and keep every wallet's history
+  consistent with its balance. They also check the repository directly: `FOR UPDATE`
+  really blocks a second transaction, and the `CHECK (balance >= 0)` constraint
+  refuses a negative balance even if the service check were skipped. They use a
+  separate database, `wallet_test`, and skip themselves when `TEST_DATABASE_URL` is
+  not set.
 
 ## API
 
