@@ -1,6 +1,8 @@
-// Package service holds the business logic (use cases): validation,
-// locking order, balance checks and idempotency. It knows nothing about HTTP
-// or about which database is used; it only talks to the ports in ports.go.
+// Package service holds the business logic: validation, balance checks,
+// locking order and idempotency.
+//
+// It knows nothing about HTTP or about which database is used. It reads and
+// writes data only through the interfaces in repository.go.
 package service
 
 import "context"

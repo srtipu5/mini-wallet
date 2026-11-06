@@ -5,8 +5,8 @@ package routes
 import (
 	"net/http"
 
-	"github.com/srtipu5/mini-wallet/internal/delivery/http/handler"
-	"github.com/srtipu5/mini-wallet/internal/delivery/http/middleware"
+	"github.com/srtipu5/mini-wallet/internal/handler"
+	"github.com/srtipu5/mini-wallet/internal/middleware"
 	"github.com/srtipu5/mini-wallet/internal/service"
 )
 

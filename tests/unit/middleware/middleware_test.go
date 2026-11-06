@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/srtipu5/mini-wallet/internal/delivery/http/middleware"
+	"github.com/srtipu5/mini-wallet/internal/middleware"
 )
 
 func TestRecover_PanicBecomes500(t *testing.T) {

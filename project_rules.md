@@ -24,25 +24,29 @@ features and cleverness.
 Before calling any change done: `gofmt -l .` prints nothing, `go vet ./...`
 passes, and `make test` passes.
 
-## Architecture: pragmatic Clean Architecture
+## Architecture
+
+Keep it simple: **routes → handler → service → repository**. Each layer has one
+job and its own folder. Easy to understand comes first; add abstraction only
+when a real need appears.
 
 ```
-delivery/http (routes → handler)  ──►  service  ──►  domain
-infrastructure/<db>/repository  ──implements──►  service ports
+routes ──► handler ──► service ──► repository/postgres
+                          │
+                          └── uses only the interfaces in service/repository.go
 ```
 
-### Dependency rule (never break this)
+### Who may import whom (never break this)
 
 | Package | May import |
 |---|---|
 | `domain` | standard library only |
 | `dto` | `domain` |
-| `service` | `domain`, `dto` (never HTTP, never `pgx`) |
-| `delivery/http/handler` | `service`, `dto`, `domain`, `utils` |
-| `delivery/http/routes` | `handler`, `middleware`, `service` |
-| `infrastructure/postgres/repository` | `service` (ports), `domain`, `pgx` |
-| `delivery/http/middleware` | `utils` |
-| `infrastructure/postgres` | `migrations`, `pgx`, `golang-migrate` |
+| `service` | `domain`, `dto` (never `net/http`, never `pgx`) |
+| `handler` | `service`, `dto`, `domain`, `utils` |
+| `routes` | `handler`, `middleware`, `service` |
+| `middleware` | `utils` |
+| `repository/postgres` | `service` (interfaces), `domain`, `migrations`, `pgx`, `golang-migrate` |
 | `config` | standard library only |
 | `utils` | `domain` |
 
@@ -53,13 +57,13 @@ Check it with:
 
 | What | Where |
 |---|---|
-| New route | `internal/delivery/http/routes/routes.go`, and nowhere else |
-| HTTP handler | `internal/delivery/http/handler/<resource>_handler.go` (exported method on `Handler`) |
-| Request body / use-case input / output | `internal/dto/<resource>.go` (`XxxRequest`, `XxxInput`) |
-| Business rule or use case | `internal/service/<resource>_service.go` |
-| New repository method | Add it to the interface in `internal/service/ports.go` first, then implement it in `internal/infrastructure/postgres/repository/<table>_repository.go` |
-| SQL | Only in `internal/infrastructure/postgres/repository` |
-| New database / external system | Its own folder per technology: `internal/infrastructure/<tech>/` with `connection.go` and `repository/` implementing the same ports. Only `cmd/api/main.go` chooses which one to wire; `service` never changes |
+| New route | `internal/routes/routes.go`, and nowhere else |
+| HTTP handler | `internal/handler/<resource>_handler.go` (exported method on `Handler`) |
+| Request body / service input / response shape | `internal/dto/<resource>.go` (`XxxRequest`, `XxxInput`, `XxxResult`) |
+| Business rule | `internal/service/<feature>_service.go` |
+| New repository method | Add it to the interface in `internal/service/repository.go` first, then implement it in `internal/repository/postgres/<table>_repository.go` |
+| SQL | Only in `internal/repository/postgres` |
+| Another database | A new sibling folder `internal/repository/<name>/` implementing the same interfaces. Only `cmd/api/main.go` chooses which one to use; `service` never changes |
 | Entity, error code, validation rule | `internal/domain` |
 | Shared HTTP helper | `internal/utils` (no business rules) |
 | Setting from env | `internal/config` |
@@ -72,9 +76,17 @@ Check it with:
   `utils.WriteJSON` / `utils.WriteError` / `utils.WriteIdempotent`. No business
   rules, no SQL.
 - **Service**: validation, business rules, transactions (`store.WithinTx`),
-  idempotency (`runIdempotent`). Talks to the database only through the ports.
+  idempotency (`runIdempotent`). Talks to the database only through the
+  interfaces in `service/repository.go`.
 - **Repository**: SQL only. Translates Postgres errors (unique and check
   violations) into `domain` errors. No business decisions.
+
+### Keep it simple
+
+- Prefer plain names over pattern jargon (no "ports", "adapters", "use cases"
+  folders).
+- No new folder, interface or layer until there is a second real use for it.
+- Folders at most two levels deep under `internal/`.
 
 ## Money rules (non-negotiable)
 
@@ -120,7 +132,7 @@ Check it with:
 - **Never export a function just to test it.** Test it through the public behaviour
   instead.
 - Service logic is unit-tested against the in-memory fake in
-  `tests/unit/service/fake_store_test.go`. When you add a port method, add it to the
+  `tests/unit/service/fake_store_test.go`. When you add a repository method, add it to the
   fake too.
 - Every new rule or bug fix gets a test. Concurrency-sensitive changes (locking,
   idempotency, balances) need an integration test that runs requests concurrently

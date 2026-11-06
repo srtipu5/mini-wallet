@@ -10,9 +10,8 @@ import (
 	"syscall"
 
 	"github.com/srtipu5/mini-wallet/internal/config"
-	"github.com/srtipu5/mini-wallet/internal/delivery/http/routes"
-	"github.com/srtipu5/mini-wallet/internal/infrastructure/postgres"
-	"github.com/srtipu5/mini-wallet/internal/infrastructure/postgres/repository"
+	"github.com/srtipu5/mini-wallet/internal/repository/postgres"
+	"github.com/srtipu5/mini-wallet/internal/routes"
 	"github.com/srtipu5/mini-wallet/internal/service"
 )
 
@@ -42,8 +41,8 @@ func run() error {
 	}
 	slog.Info("migrations applied")
 
-	// Wire the layers: repository (Postgres) -> service (use cases) -> handler (HTTP).
-	store := repository.NewStore(pool)
+	// Wire the layers: repository (Postgres) -> service (business logic) -> routes/handlers (HTTP).
+	store := postgres.NewStore(pool)
 	svc := service.New(store)
 	router := routes.NewRouter(svc)
 

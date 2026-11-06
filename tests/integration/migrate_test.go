@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/srtipu5/mini-wallet/internal/infrastructure/postgres"
+	"github.com/srtipu5/mini-wallet/internal/repository/postgres"
 )
 
 // Migrations accept both URL schemes and are safe to run again on an

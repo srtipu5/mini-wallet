@@ -6,10 +6,12 @@ import (
 	"github.com/srtipu5/mini-wallet/internal/domain"
 )
 
-// Ports: the interfaces the business logic needs from the outside world.
-// They are defined here (the inner layer) and implemented by the
-// repository package (the outer layer), so the service layer never imports
-// a database driver.
+// The repository interfaces the service needs.
+//
+// They are defined here, next to the code that uses them, and implemented in
+// internal/repository/postgres. This is why the service never imports a
+// database driver, and why another database could be added without changing
+// the business logic.
 
 type WalletRepository interface {
 	Create(ctx context.Context, userID, phone string) (domain.Wallet, error)

@@ -11,7 +11,7 @@ import (
 
 	"github.com/srtipu5/mini-wallet/internal/service"
 
-	"github.com/srtipu5/mini-wallet/internal/delivery/http/routes"
+	"github.com/srtipu5/mini-wallet/internal/routes"
 )
 
 // stubStore lets the router run without a database. Its repositories are

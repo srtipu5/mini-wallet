@@ -11,7 +11,7 @@ import (
 	"github.com/srtipu5/mini-wallet/internal/service"
 )
 
-// fakeStore is an in-memory implementation of the service.Store port, so the business
+// fakeStore is an in-memory implementation of the service.Store interface, so the business
 // logic can be tested without Postgres. WithinTx snapshots the state and
 // restores it if fn fails, which mimics a database rollback.
 type fakeStore struct {

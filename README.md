@@ -63,7 +63,7 @@ All tests live in `tests/`, split by kind:
 tests/
   unit/                 no database needed (make test-unit)
     domain/               validation rules, error codes
-    service/              business logic against an in-memory fake of the ports
+    service/              business logic against an in-memory fake repository
     handler/              routing, request rejection, history query parsing
     middleware/           panic recovery, request logging
     utils/                JSON decoding, error-to-status mapping, query parsing
@@ -73,7 +73,7 @@ tests/
 
 - **Unit tests** test each layer through its public API only. The service
   tests use a fake store (`tests/unit/service/fake_store_test.go`) that
-  implements the repository ports in memory and imitates rollback. They check
+  implements the repository interfaces in memory and imitates rollback. They check
   balance rules, sorted lock order, rollback when a step fails, and idempotency
   (replay, reuse, released keys).
 - **Integration tests** (`tests/integration/`) cover every rule below, including the
@@ -202,40 +202,38 @@ Implemented in [`internal/service/idempotency.go`](internal/service/idempotency.
 
 ## Project layout
 
-The code follows a pragmatic Clean Architecture. Folders are grouped by layer,
-and dependencies only point inwards:
+Each request flows through three layers, each in its own folder:
 
 ```
-delivery (HTTP)  ──►  service (use cases)  ──►  domain
-infrastructure (Postgres)  ──implements──►  service ports
+HTTP request ──► routes ──► handler ──► service ──► repository ──► PostgreSQL
+                            (HTTP)      (business     (SQL)
+                                         logic)
 ```
 
-The business logic in `service` never imports HTTP or a database driver. It
-talks to the database only through the interfaces in `service/ports.go`,
-which `infrastructure/postgres/repository` implements.
+- **handler** reads the request and writes the response. No business rules.
+- **service** holds every business rule (limits, balance checks, locking, idempotency).
+  It never imports HTTP or the database driver.
+- **repository** holds all SQL. The service uses it only through the interfaces in
+  `service/repository.go`, so another database could be added in
+  `repository/<name>/` without touching the business logic.
 
 ```
-cmd/api/main.go                      entry point: load config, connect DB, run migrations, wire layers, graceful shutdown
+cmd/api/main.go            entry point: config, DB connection, migrations, wiring, graceful shutdown
 internal/
-  domain/                            entities, error codes, validation rules (no dependencies)
-  dto/                               data shapes crossing layers, one file per resource:
-                                       HTTP request bodies, use-case inputs, history page
-  service/                           use cases (business logic)
-    ports.go                           interfaces the use cases need: repositories + Store (transactions)
-    *_service.go                       wallet, add money, transfer, transaction history
-    idempotency.go                     exactly-once execution for add money and transfers
-  delivery/http/                     HTTP layer
-    routes/                          every route in one place + middleware chain
-    handler/                         one *_handler.go per resource
-    middleware/                      panic recovery, request logging
-  infrastructure/                    one folder per external technology
-    postgres/
-      connection.go                    connection pool and migration runner
-      repository/                      PostgreSQL implementation of the ports (all SQL)
-        store.go                         Store: pool access and WithinTx
-        *_repository.go                  one file per table
-  config/                            settings from environment variables (DATABASE_URL, PORT, timeouts)
-  utils/                             shared HTTP helpers: JSON decoding, responses/errors, query params
-migrations/                          SQL schema (embedded into the binary)
-tests/                               all tests: unit/ (per layer, no DB) and integration/ (real Postgres)
+  routes/                  every URL in one place, plus the middleware chain
+  handler/                 one file per resource (wallet, transfer, transaction, health)
+  middleware/              panic recovery, request logging
+  service/                 business logic, one file per feature
+    repository.go            the repository interfaces the service needs
+    idempotency.go           exactly-once execution for add money and transfers
+  repository/
+    postgres/              PostgreSQL implementation: connection, migrations, all SQL
+  domain/                  entities, error codes, validation rules (no dependencies)
+  dto/                     request bodies, service inputs, response shapes
+  config/                  settings from environment variables
+  utils/                   shared HTTP helpers: JSON decoding, error responses, query params
+migrations/                SQL schema (embedded into the binary)
+tests/
+  unit/                    one folder per package, no database needed
+  integration/             real HTTP requests against a real PostgreSQL
 ```

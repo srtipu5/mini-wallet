@@ -1,6 +1,4 @@
-// Package repository is the PostgreSQL implementation of the service
-// ports (see internal/service/ports.go). It contains all SQL.
-package repository
+package postgres
 
 import (
 	"context"

@@ -1,6 +1,17 @@
+// Package dto holds the data shapes that cross layer boundaries, one file per
+// resource:
+//
+//   - *Request: HTTP request bodies, decoded by the handlers.
+//   - *Input:   use-case inputs, passed from the handlers to the service.
+//   - outputs:  use-case results that are not domain entities (e.g. HistoryPage).
+//
+// It depends only on the domain package.
 package dto
 
-import "encoding/json"
+import (
+	"encoding/json"
+	"time"
+)
 
 // CreateWalletRequest is the body of POST /api/v1/wallets.
 type CreateWalletRequest struct {
@@ -24,4 +35,15 @@ type AddMoneyInput struct {
 	WalletID   string `json:"wallet_id"`
 	Amount     int64  `json:"amount"`
 	GatewayRef string `json:"gateway_ref"`
+}
+
+// AddMoneyResult is the response of a successful add-money call.
+// Keep the JSON tags stable: stored idempotent responses are decoded into it.
+type AddMoneyResult struct {
+	TransactionID int64     `json:"transaction_id"`
+	WalletID      string    `json:"wallet_id"`
+	Amount        int64     `json:"amount"`
+	GatewayRef    string    `json:"gateway_ref"`
+	BalanceAfter  int64     `json:"balance_after"`
+	CreatedAt     time.Time `json:"created_at"`
 }

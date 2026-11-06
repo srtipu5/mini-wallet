@@ -1,3 +1,5 @@
+// Package domain holds the core entities, error codes and validation rules.
+// It has no dependencies, and every other layer depends on it.
 package domain
 
 import "time"
@@ -30,16 +32,6 @@ type Transfer struct {
 	Note         *string   `json:"note"`
 	Status       string    `json:"status"`
 	CreatedAt    time.Time `json:"created_at"`
-}
-
-// AddMoneyResult is the response of a successful add-money call.
-type AddMoneyResult struct {
-	TransactionID int64     `json:"transaction_id"`
-	WalletID      string    `json:"wallet_id"`
-	Amount        int64     `json:"amount"`
-	GatewayRef    string    `json:"gateway_ref"`
-	BalanceAfter  int64     `json:"balance_after"`
-	CreatedAt     time.Time `json:"created_at"`
 }
 
 // Transaction is one entry in a wallet's history (ledger).

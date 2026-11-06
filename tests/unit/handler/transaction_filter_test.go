@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/srtipu5/mini-wallet/internal/delivery/http/routes"
 	"github.com/srtipu5/mini-wallet/internal/domain"
+	"github.com/srtipu5/mini-wallet/internal/routes"
 	"github.com/srtipu5/mini-wallet/internal/service"
 )
 

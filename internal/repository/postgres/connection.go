@@ -1,5 +1,7 @@
-// Package postgres opens the connection pool and applies migrations.
-// The SQL implementation of the service ports lives in ./repository.
+// Package postgres is the PostgreSQL implementation of the repository
+// interfaces in internal/service/repository.go. All SQL lives here, together
+// with the connection and migration code.
+//
 // Another database would get its own sibling package (e.g. ../mongodb).
 package postgres
 
