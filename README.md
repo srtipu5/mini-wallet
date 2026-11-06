@@ -71,7 +71,7 @@ transfer must be between **100** and **2,500,000** poisha.
 | `GET` | `/api/v1/wallets/{wallet_id}` | **200**, the wallet with its current balance |
 | `POST` | `/api/v1/wallets/{wallet_id}/add-money` | Needs an `Idempotency-Key` header. Body `{"amount","gateway_ref"}` → **201** |
 | `POST` | `/api/v1/transfers` | Needs an `Idempotency-Key` header. Body `{"from_wallet_id","to_wallet_id","amount","note"?}` → **201** |
-| `GET` | `/api/v1/wallets/{wallet_id}/transactions` | **200**. Optional query parameters: `type`, `from`, `to`, `page`, `page_size` |
+| `GET` | `/api/v1/wallets/{wallet_id}/transactions` | **200**. Optional query parameters: `type` (`ADD_MONEY`, `TRANSFER_OUT` or `TRANSFER_IN`), `from`, `to`, `page`, `page_size` |
 | `GET` | `/health` | Checks that the database is reachable |
 
 ### Examples
@@ -228,6 +228,27 @@ curl -X POST localhost:8080/api/v1/transfers \
 | No `Idempotency-Key` header | 400 | `MISSING_IDEMPOTENCY_KEY` |
 
 #### Transaction history
+
+All query parameters are optional and can be combined:
+
+| Parameter | Allowed values | Default |
+|---|---|---|
+| `type` | `ADD_MONEY`, `TRANSFER_OUT`, `TRANSFER_IN` | all types |
+| `from` | Date (`2026-11-01`) or date-time (`2026-11-01T10:00:00Z`) | no lower limit |
+| `to` | Date (`2026-11-30`, includes the whole day) or date-time | no upper limit |
+| `page` | Integer, `1` or more | `1` |
+| `page_size` | Integer, `1` to `100` | `20` |
+
+What each `type` means:
+
+| `type` | Meaning | `reference_id` | `counterparty_wallet_id` |
+|---|---|---|---|
+| `ADD_MONEY` | Money added from the payment gateway | `gateway_ref` | `null` |
+| `TRANSFER_OUT` | Money sent to another wallet | `transfer_id` | Receiver |
+| `TRANSFER_IN` | Money received from another wallet | `transfer_id` | Sender |
+
+Any other `type` value returns `400 VALIDATION_ERROR` with the message
+`"The type parameter must be one of ADD_MONEY, TRANSFER_OUT, TRANSFER_IN."`
 
 ```bash
 curl localhost:8080/api/v1/wallets/56055a57-787f-49e0-bd63-0185b9bc131d/transactions
