@@ -4,24 +4,11 @@ import (
 	"context"
 
 	"github.com/srtipu5/mini-wallet/internal/domain"
-	"github.com/srtipu5/mini-wallet/internal/repository"
 )
-
-type HistoryPage struct {
-	Data       []domain.Transaction `json:"data"`
-	Pagination Pagination           `json:"pagination"`
-}
-
-type Pagination struct {
-	Page       int `json:"page"`
-	PageSize   int `json:"page_size"`
-	TotalItems int `json:"total_items"`
-	TotalPages int `json:"total_pages"`
-}
 
 // ListTransactions returns a page of a wallet's history, newest first.
 // The filter has already been validated by the HTTP layer.
-func (s *Service) ListTransactions(ctx context.Context, f repository.HistoryFilter) (HistoryPage, error) {
+func (s *Service) ListTransactions(ctx context.Context, f domain.TransactionFilter) (HistoryPage, error) {
 	// 404 for an unknown wallet, instead of an empty list.
 	wallet, err := s.GetWallet(ctx, f.WalletID)
 	if err != nil {
@@ -29,7 +16,7 @@ func (s *Service) ListTransactions(ctx context.Context, f repository.HistoryFilt
 	}
 	f.WalletID = wallet.ID
 
-	items, total, err := repository.ListTransactions(ctx, s.db, f)
+	items, total, err := s.store.Repos().Transactions.List(ctx, f)
 	if err != nil {
 		return HistoryPage{}, err
 	}

@@ -1,7 +1,6 @@
 package handler
 
 import (
-	"encoding/json"
 	"net/url"
 	"testing"
 	"time"
@@ -9,28 +8,8 @@ import (
 	"github.com/srtipu5/mini-wallet/internal/domain"
 )
 
-func TestParseAmount(t *testing.T) {
-	ok := map[string]int64{"100": 100, "2500000": 2500000, " 5000 ": 5000, "-5": -5}
-	for raw, want := range ok {
-		got, err := parseAmount(json.RawMessage(raw))
-		if err != nil || got != want {
-			t.Errorf("parseAmount(%s) = %d, %v; want %d", raw, got, err, want)
-		}
-	}
-
-	// Money must be an integer: floats, exponents, strings, null, missing -> INVALID_AMOUNT.
-	bad := []string{"", "null", "100.5", "100.0", "1e3", `"100"`, "true", "99999999999999999999"}
-	for _, raw := range bad {
-		_, err := parseAmount(json.RawMessage(raw))
-		e, isDomain := domain.AsError(err)
-		if !isDomain || e.Code != domain.CodeInvalidAmount {
-			t.Errorf("parseAmount(%s): want INVALID_AMOUNT, got %v", raw, err)
-		}
-	}
-}
-
-func TestParseHistoryFilter_Defaults(t *testing.T) {
-	f, err := parseHistoryFilter(url.Values{})
+func TestParseTransactionFilter_Defaults(t *testing.T) {
+	f, err := parseTransactionFilter(url.Values{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -39,8 +18,8 @@ func TestParseHistoryFilter_Defaults(t *testing.T) {
 	}
 }
 
-func TestParseHistoryFilter_Valid(t *testing.T) {
-	f, err := parseHistoryFilter(url.Values{
+func TestParseTransactionFilter_Valid(t *testing.T) {
+	f, err := parseTransactionFilter(url.Values{
 		"type":      {"transfer_in"},
 		"page":      {"3"},
 		"page_size": {"100"},
@@ -60,7 +39,7 @@ func TestParseHistoryFilter_Valid(t *testing.T) {
 		t.Errorf("from=%v to=%v; want %v and %v", f.From, f.To, wantFrom, wantTo)
 	}
 
-	f, err = parseHistoryFilter(url.Values{"from": {"2026-11-01T10:00:00Z"}, "to": {"2026-11-01T18:00:00+06:00"}})
+	f, err = parseTransactionFilter(url.Values{"from": {"2026-11-01T10:00:00Z"}, "to": {"2026-11-01T18:00:00+06:00"}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -69,7 +48,7 @@ func TestParseHistoryFilter_Valid(t *testing.T) {
 	}
 }
 
-func TestParseHistoryFilter_Invalid(t *testing.T) {
+func TestParseTransactionFilter_Invalid(t *testing.T) {
 	cases := []url.Values{
 		{"type": {"REFUND"}},
 		{"page": {"0"}},
@@ -81,8 +60,8 @@ func TestParseHistoryFilter_Invalid(t *testing.T) {
 		{"from": {"2026-11-05"}, "to": {"2026-11-01"}}, // from after to
 	}
 	for _, q := range cases {
-		if _, err := parseHistoryFilter(q); err == nil {
-			t.Errorf("parseHistoryFilter(%v) should fail", q)
+		if _, err := parseTransactionFilter(q); err == nil {
+			t.Errorf("parseTransactionFilter(%v) should fail", q)
 		}
 	}
 }

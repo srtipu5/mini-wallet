@@ -5,15 +5,18 @@ import (
 	"errors"
 
 	"github.com/jackc/pgx/v5"
+
+	"github.com/srtipu5/mini-wallet/internal/application"
+	"github.com/srtipu5/mini-wallet/internal/domain"
 )
 
-// IdempotencyRecord is a key that was already used successfully.
-type IdempotencyRecord struct {
-	RequestHash  string
-	ResponseBody []byte
+type idempotencyRepository struct {
+	db DBTX
 }
 
-// ClaimIdempotencyKey tries to reserve (scope, key) inside tx.
+var _ application.IdempotencyRepository = (*idempotencyRepository)(nil)
+
+// Claim tries to reserve (scope, key). It must run inside a transaction.
 //
 //   - Key is new: the row is inserted, and nil is returned. The caller now
 //     owns the key and must do the work in the same transaction.
@@ -24,8 +27,8 @@ type IdempotencyRecord struct {
 //     succeeds and we become the owner.
 //
 // This is what makes concurrent requests with the same key execute exactly once.
-func ClaimIdempotencyKey(ctx context.Context, tx pgx.Tx, scope, key, requestHash string) (*IdempotencyRecord, error) {
-	tag, err := tx.Exec(ctx,
+func (r *idempotencyRepository) Claim(ctx context.Context, scope, key, requestHash string) (*domain.IdempotencyRecord, error) {
+	tag, err := r.db.Exec(ctx,
 		`INSERT INTO idempotency_keys (scope, key, request_hash) VALUES ($1, $2, $3)
 		 ON CONFLICT (scope, key) DO NOTHING`,
 		scope, key, requestHash)
@@ -36,8 +39,8 @@ func ClaimIdempotencyKey(ctx context.Context, tx pgx.Tx, scope, key, requestHash
 		return nil, nil // claimed
 	}
 
-	var rec IdempotencyRecord
-	err = tx.QueryRow(ctx,
+	var rec domain.IdempotencyRecord
+	err = r.db.QueryRow(ctx,
 		`SELECT request_hash, response_body FROM idempotency_keys WHERE scope = $1 AND key = $2`,
 		scope, key).Scan(&rec.RequestHash, &rec.ResponseBody)
 	if errors.Is(err, pgx.ErrNoRows) {
@@ -47,9 +50,9 @@ func ClaimIdempotencyKey(ctx context.Context, tx pgx.Tx, scope, key, requestHash
 	return &rec, err
 }
 
-// SaveIdempotencyResponse stores the success response for a claimed key.
-func SaveIdempotencyResponse(ctx context.Context, tx pgx.Tx, scope, key string, body []byte) error {
-	_, err := tx.Exec(ctx,
+// SaveResponse stores the success response for a claimed key.
+func (r *idempotencyRepository) SaveResponse(ctx context.Context, scope, key string, body []byte) error {
+	_, err := r.db.Exec(ctx,
 		`UPDATE idempotency_keys SET response_body = $3 WHERE scope = $1 AND key = $2`,
 		scope, key, body)
 	return err

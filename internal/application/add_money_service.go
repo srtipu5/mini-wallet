@@ -4,17 +4,8 @@ import (
 	"context"
 	"strings"
 
-	"github.com/jackc/pgx/v5"
-
 	"github.com/srtipu5/mini-wallet/internal/domain"
-	"github.com/srtipu5/mini-wallet/internal/repository"
 )
-
-type AddMoneyInput struct {
-	WalletID   string `json:"wallet_id"`
-	Amount     int64  `json:"amount"`
-	GatewayRef string `json:"gateway_ref"`
-}
 
 // AddMoney credits a wallet after a (simulated) payment-gateway confirmation.
 func (s *Service) AddMoney(ctx context.Context, idempotencyKey string, in AddMoneyInput) (domain.AddMoneyResult, bool, error) {
@@ -30,10 +21,10 @@ func (s *Service) AddMoney(ctx context.Context, idempotencyKey string, in AddMon
 		return domain.AddMoneyResult{}, false, err
 	}
 
-	return runIdempotent(ctx, s.db, scopeAddMoney, idempotencyKey, in,
-		func(tx pgx.Tx) (domain.AddMoneyResult, error) {
+	return runIdempotent(ctx, s.store, scopeAddMoney, idempotencyKey, in,
+		func(r Repositories) (domain.AddMoneyResult, error) {
 			// UPDATE locks the wallet row and returns the new balance.
-			balance, err := repository.ChangeBalance(ctx, tx, in.WalletID, in.Amount)
+			balance, err := r.Wallets.ChangeBalance(ctx, in.WalletID, in.Amount)
 			if err != nil {
 				return domain.AddMoneyResult{}, err
 			}
@@ -47,7 +38,7 @@ func (s *Service) AddMoney(ctx context.Context, idempotencyKey string, in AddMon
 				BalanceAfter: balance,
 				ReferenceID:  in.GatewayRef,
 			}
-			if err := repository.InsertTransaction(ctx, tx, in.WalletID, &entry); err != nil {
+			if err := r.Transactions.Insert(ctx, in.WalletID, &entry); err != nil {
 				return domain.AddMoneyResult{}, err
 			}
 

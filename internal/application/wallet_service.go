@@ -5,7 +5,6 @@ import (
 	"strings"
 
 	"github.com/srtipu5/mini-wallet/internal/domain"
-	"github.com/srtipu5/mini-wallet/internal/repository"
 )
 
 func (s *Service) CreateWallet(ctx context.Context, userID, phone string) (domain.Wallet, error) {
@@ -15,7 +14,7 @@ func (s *Service) CreateWallet(ctx context.Context, userID, phone string) (domai
 	if err := domain.ValidatePhone(phone); err != nil {
 		return domain.Wallet{}, err
 	}
-	return repository.CreateWallet(ctx, s.db, userID, phone)
+	return s.store.Repos().Wallets.Create(ctx, userID, phone)
 }
 
 func (s *Service) GetWallet(ctx context.Context, walletID string) (domain.Wallet, error) {
@@ -23,5 +22,5 @@ func (s *Service) GetWallet(ctx context.Context, walletID string) (domain.Wallet
 	if !domain.IsValidWalletID(walletID) {
 		return domain.Wallet{}, domain.ErrWalletNotFound
 	}
-	return repository.GetWallet(ctx, s.db, walletID)
+	return s.store.Repos().Wallets.Get(ctx, walletID)
 }

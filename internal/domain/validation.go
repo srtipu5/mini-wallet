@@ -20,6 +20,18 @@ const (
 	MaxIdempotencyKeyLength = 255
 )
 
+// Transaction history paging limits.
+const (
+	DefaultPageSize = 20
+	MaxPageSize     = 100
+	MaxPage         = 100_000 // keeps OFFSET sane
+)
+
+// IsValidTransactionType reports whether t is a known history entry type.
+func IsValidTransactionType(t string) bool {
+	return t == TxAddMoney || t == TxTransferOut || t == TxTransferIn
+}
+
 // Bangladeshi mobile number in local format: 01 + operator digit (3-9) + 8 digits.
 var phonePattern = regexp.MustCompile(`^01[3-9][0-9]{8}$`)
 

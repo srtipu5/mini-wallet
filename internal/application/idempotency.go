@@ -6,11 +6,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 
-	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgxpool"
-
 	"github.com/srtipu5/mini-wallet/internal/domain"
-	"github.com/srtipu5/mini-wallet/internal/repository"
 )
 
 const (
@@ -33,18 +29,18 @@ const (
 // rolled back: nothing happened, so the client may safely retry with the key.
 func runIdempotent[T any](
 	ctx context.Context,
-	db *pgxpool.Pool,
+	store Store,
 	scope, key string,
 	request any,
-	work func(tx pgx.Tx) (T, error),
+	work func(r Repositories) (T, error),
 ) (result T, replayed bool, err error) {
 	hash, err := hashRequest(request)
 	if err != nil {
 		return result, false, err
 	}
 
-	err = pgx.BeginFunc(ctx, db, func(tx pgx.Tx) error {
-		existing, err := repository.ClaimIdempotencyKey(ctx, tx, scope, key, hash)
+	err = store.WithinTx(ctx, func(r Repositories) error {
+		existing, err := r.Idempotency.Claim(ctx, scope, key, hash)
 		if err != nil {
 			return err
 		}
@@ -57,7 +53,7 @@ func runIdempotent[T any](
 			return json.Unmarshal(existing.ResponseBody, &result)
 		}
 
-		result, err = work(tx)
+		result, err = work(r)
 		if err != nil {
 			return err
 		}
@@ -66,7 +62,7 @@ func runIdempotent[T any](
 		if err != nil {
 			return err
 		}
-		return repository.SaveIdempotencyResponse(ctx, tx, scope, key, body)
+		return r.Idempotency.SaveResponse(ctx, scope, key, body)
 	})
 	return result, replayed, err
 }

@@ -185,14 +185,40 @@ Implemented in [`internal/application/idempotency.go`](internal/application/idem
 
 ## Project layout
 
+The code follows a pragmatic Clean Architecture. Folders are grouped by layer,
+and dependencies only point inwards:
+
 ```
-cmd/api/                       entry point: config, DB connection, migrations, HTTP server, graceful shutdown
-internal/domain/               models, error codes, validation rules (no dependencies)
-internal/application/          business logic: transfers, add money, idempotency, history
-internal/repository/           all SQL (pgx)
-internal/handler/              HTTP: routing, JSON parsing, error → status mapping
-internal/middleware/           panic recovery, request logging
-internal/infrastructure/postgres/  connection pool and migration runner
-migrations/                    SQL schema (embedded into the binary)
-tests/                         end-to-end tests against real Postgres
+delivery (HTTP)  ──►  application (use cases)  ──►  domain
+infrastructure (Postgres)  ──implements──►  application ports
+```
+
+The business logic in `application` never imports HTTP or a database driver. It
+talks to the database only through the interfaces in `application/ports.go`,
+which `infrastructure/repository` implements.
+
+```
+cmd/api/main.go                      entry point: load config, connect DB, run migrations, wire layers, graceful shutdown
+internal/
+  domain/                            entities, error codes, validation rules (no dependencies)
+  application/                       use cases (business logic)
+    ports.go                           interfaces the use cases need: repositories + Store (transactions)
+    dto.go                             use-case inputs and outputs
+    *_service.go                       wallet, add money, transfer, transaction history
+    idempotency.go                     exactly-once execution for add money and transfers
+  delivery/http/                     HTTP layer
+    handler/
+      routes.go                        every route in one place
+      dto.go                           request bodies
+      *_handler.go                     one file per resource
+    middleware/                      panic recovery, request logging
+  infrastructure/
+    postgres/                        connection pool and migration runner
+    repository/                      PostgreSQL implementation of the ports (all SQL)
+      store.go                         Store: pool access and WithinTx
+      *_repository.go                  one file per table
+  config/                            settings from environment variables (DATABASE_URL, PORT, timeouts)
+  utils/                             shared helpers: JSON decoding, responses/errors, query params, env
+migrations/                          SQL schema (embedded into the binary)
+tests/                               end-to-end tests against real Postgres
 ```

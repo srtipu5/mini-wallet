@@ -1,0 +1,61 @@
+package application
+
+import (
+	"context"
+
+	"github.com/srtipu5/mini-wallet/internal/domain"
+)
+
+// Ports: the interfaces the business logic needs from the outside world.
+// They are defined here (the inner layer) and implemented by the
+// repository package (the outer layer), so the application never imports
+// a database driver.
+
+type WalletRepository interface {
+	Create(ctx context.Context, userID, phone string) (domain.Wallet, error)
+	Get(ctx context.Context, id string) (domain.Wallet, error)
+	// Lock takes a row lock (SELECT ... FOR UPDATE) and returns the balance.
+	// Only meaningful inside Store.WithinTx.
+	Lock(ctx context.Context, id string) (int64, error)
+	// ChangeBalance adds delta (may be negative) and returns the new balance.
+	ChangeBalance(ctx context.Context, id string, delta int64) (int64, error)
+}
+
+type TransactionRepository interface {
+	// Insert writes one ledger entry and fills in its ID and CreatedAt.
+	Insert(ctx context.Context, walletID string, t *domain.Transaction) error
+	// List returns one page (newest first) and the total number of matches.
+	List(ctx context.Context, f domain.TransactionFilter) ([]domain.Transaction, int, error)
+}
+
+type TransferRepository interface {
+	Insert(ctx context.Context, fromID, toID string, amount int64, note *string) (domain.Transfer, error)
+}
+
+type IdempotencyRepository interface {
+	// Claim reserves (scope, key). It returns nil if the key is new (the
+	// caller now owns it), or the stored record if the key was already used.
+	Claim(ctx context.Context, scope, key, requestHash string) (*domain.IdempotencyRecord, error)
+	// SaveResponse stores the success response for a claimed key.
+	SaveResponse(ctx context.Context, scope, key string, body []byte) error
+}
+
+// Repositories groups every repository. Depending on where it comes from,
+// they all run on the connection pool or all inside one transaction.
+type Repositories struct {
+	Wallets      WalletRepository
+	Transactions TransactionRepository
+	Transfers    TransferRepository
+	Idempotency  IdempotencyRepository
+}
+
+// Store gives access to the repositories and to database transactions.
+type Store interface {
+	// Repos returns repositories that run outside a transaction (simple reads/writes).
+	Repos() Repositories
+	// WithinTx runs fn inside one database transaction. If fn returns an
+	// error, everything is rolled back; otherwise it is committed.
+	WithinTx(ctx context.Context, fn func(r Repositories) error) error
+	// Ping checks that the database is reachable.
+	Ping(ctx context.Context) error
+}

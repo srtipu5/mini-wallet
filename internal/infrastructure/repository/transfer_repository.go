@@ -3,12 +3,17 @@ package repository
 import (
 	"context"
 
-	"github.com/jackc/pgx/v5"
-
+	"github.com/srtipu5/mini-wallet/internal/application"
 	"github.com/srtipu5/mini-wallet/internal/domain"
 )
 
-func InsertTransfer(ctx context.Context, tx pgx.Tx, fromID, toID string, amount int64, note *string) (domain.Transfer, error) {
+type transferRepository struct {
+	db DBTX
+}
+
+var _ application.TransferRepository = (*transferRepository)(nil)
+
+func (r *transferRepository) Insert(ctx context.Context, fromID, toID string, amount int64, note *string) (domain.Transfer, error) {
 	t := domain.Transfer{
 		FromWalletID: fromID,
 		ToWalletID:   toID,
@@ -16,7 +21,7 @@ func InsertTransfer(ctx context.Context, tx pgx.Tx, fromID, toID string, amount 
 		Note:         note,
 		Status:       domain.TransferCompleted,
 	}
-	err := tx.QueryRow(ctx,
+	err := r.db.QueryRow(ctx,
 		`INSERT INTO transfers (from_wallet_id, to_wallet_id, amount, note, status)
 		 VALUES ($1, $2, $3, $4, $5)
 		 RETURNING id::text, created_at`,

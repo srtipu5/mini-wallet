@@ -4,18 +4,8 @@ import (
 	"context"
 	"strings"
 
-	"github.com/jackc/pgx/v5"
-
 	"github.com/srtipu5/mini-wallet/internal/domain"
-	"github.com/srtipu5/mini-wallet/internal/repository"
 )
-
-type TransferInput struct {
-	FromWalletID string  `json:"from_wallet_id"`
-	ToWalletID   string  `json:"to_wallet_id"`
-	Amount       int64   `json:"amount"`
-	Note         *string `json:"note"`
-}
 
 // Transfer moves money between two wallets. Debit and credit happen in one
 // database transaction, so either both happen or neither does.
@@ -30,9 +20,9 @@ func (s *Service) Transfer(ctx context.Context, idempotencyKey string, in Transf
 		return domain.Transfer{}, false, err
 	}
 
-	return runIdempotent(ctx, s.db, scopeTransfer, idempotencyKey, in,
-		func(tx pgx.Tx) (domain.Transfer, error) {
-			return s.executeTransfer(ctx, tx, in)
+	return runIdempotent(ctx, s.store, scopeTransfer, idempotencyKey, in,
+		func(r Repositories) (domain.Transfer, error) {
+			return executeTransfer(ctx, r, in)
 		})
 }
 
@@ -58,7 +48,8 @@ func validateTransfer(in TransferInput) error {
 	return nil
 }
 
-func (s *Service) executeTransfer(ctx context.Context, tx pgx.Tx, in TransferInput) (domain.Transfer, error) {
+// executeTransfer runs inside the transaction opened by runIdempotent.
+func executeTransfer(ctx context.Context, r Repositories, in TransferInput) (domain.Transfer, error) {
 	// 1. Lock both wallets, ALWAYS in the same (sorted) order.
 	//    If A->B and B->A run at the same time, both lock the smaller id first,
 	//    so one simply waits for the other instead of deadlocking.
@@ -68,7 +59,7 @@ func (s *Service) executeTransfer(ctx context.Context, tx pgx.Tx, in TransferInp
 	}
 	balances := map[string]int64{}
 	for _, id := range []string{first, second} {
-		balance, err := repository.LockWallet(ctx, tx, id)
+		balance, err := r.Wallets.Lock(ctx, id)
 		if err != nil {
 			if id == in.FromWalletID {
 				return domain.Transfer{}, notFound("sender", err)
@@ -84,17 +75,17 @@ func (s *Service) executeTransfer(ctx context.Context, tx pgx.Tx, in TransferInp
 	}
 
 	// 3. Debit and credit.
-	fromBalance, err := repository.ChangeBalance(ctx, tx, in.FromWalletID, -in.Amount)
+	fromBalance, err := r.Wallets.ChangeBalance(ctx, in.FromWalletID, -in.Amount)
 	if err != nil {
 		return domain.Transfer{}, err
 	}
-	toBalance, err := repository.ChangeBalance(ctx, tx, in.ToWalletID, in.Amount)
+	toBalance, err := r.Wallets.ChangeBalance(ctx, in.ToWalletID, in.Amount)
 	if err != nil {
 		return domain.Transfer{}, err
 	}
 
 	// 4. Record the transfer and one ledger entry per wallet.
-	transfer, err := repository.InsertTransfer(ctx, tx, in.FromWalletID, in.ToWalletID, in.Amount, in.Note)
+	transfer, err := r.Transfers.Insert(ctx, in.FromWalletID, in.ToWalletID, in.Amount, in.Note)
 	if err != nil {
 		return domain.Transfer{}, err
 	}
@@ -103,7 +94,7 @@ func (s *Service) executeTransfer(ctx context.Context, tx pgx.Tx, in TransferInp
 		Type: domain.TxTransferOut, Amount: in.Amount, BalanceAfter: fromBalance,
 		CounterpartyWalletID: &in.ToWalletID, ReferenceID: transfer.ID,
 	}
-	if err := repository.InsertTransaction(ctx, tx, in.FromWalletID, &out); err != nil {
+	if err := r.Transactions.Insert(ctx, in.FromWalletID, &out); err != nil {
 		return domain.Transfer{}, err
 	}
 
@@ -111,7 +102,7 @@ func (s *Service) executeTransfer(ctx context.Context, tx pgx.Tx, in TransferInp
 		Type: domain.TxTransferIn, Amount: in.Amount, BalanceAfter: toBalance,
 		CounterpartyWalletID: &in.FromWalletID, ReferenceID: transfer.ID,
 	}
-	if err := repository.InsertTransaction(ctx, tx, in.ToWalletID, &inEntry); err != nil {
+	if err := r.Transactions.Insert(ctx, in.ToWalletID, &inEntry); err != nil {
 		return domain.Transfer{}, err
 	}
 

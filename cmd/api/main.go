@@ -8,11 +8,12 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
-	"time"
 
 	"github.com/srtipu5/mini-wallet/internal/application"
-	"github.com/srtipu5/mini-wallet/internal/handler"
+	"github.com/srtipu5/mini-wallet/internal/config"
+	"github.com/srtipu5/mini-wallet/internal/delivery/http/handler"
 	"github.com/srtipu5/mini-wallet/internal/infrastructure/postgres"
+	"github.com/srtipu5/mini-wallet/internal/infrastructure/repository"
 )
 
 func main() {
@@ -24,36 +25,40 @@ func main() {
 }
 
 func run() error {
-	databaseURL := getenv("DATABASE_URL", "postgres://wallet:wallet@localhost:5432/wallet?sslmode=disable")
-	port := getenv("PORT", "8080")
+	cfg := config.Load()
 
 	// Stop cleanly on Ctrl+C / `docker compose down`.
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	pool, err := postgres.Connect(ctx, databaseURL)
+	pool, err := postgres.Connect(ctx, cfg.DatabaseURL)
 	if err != nil {
 		return err
 	}
 	defer pool.Close()
 
-	if err := postgres.Migrate(databaseURL); err != nil {
+	if err := postgres.Migrate(cfg.DatabaseURL); err != nil {
 		return err
 	}
 	slog.Info("migrations applied")
 
+	// Wire the layers: repository (Postgres) -> application (use cases) -> handler (HTTP).
+	store := repository.NewStore(pool)
+	service := application.NewService(store)
+	router := handler.NewRouter(service)
+
 	server := &http.Server{
-		Addr:              ":" + port,
-		Handler:           handler.NewRouter(application.NewService(pool)),
-		ReadHeaderTimeout: 5 * time.Second,
-		ReadTimeout:       10 * time.Second,
-		WriteTimeout:      30 * time.Second,
-		IdleTimeout:       60 * time.Second,
+		Addr:              ":" + cfg.Port,
+		Handler:           router,
+		ReadHeaderTimeout: cfg.ReadHeaderTimeout,
+		ReadTimeout:       cfg.ReadTimeout,
+		WriteTimeout:      cfg.WriteTimeout,
+		IdleTimeout:       cfg.IdleTimeout,
 	}
 
 	serverErr := make(chan error, 1)
 	go func() {
-		slog.Info("server started", "port", port)
+		slog.Info("server started", "port", cfg.Port)
 		serverErr <- server.ListenAndServe()
 	}()
 
@@ -67,14 +72,7 @@ func run() error {
 	}
 
 	// Let in-flight requests (and their DB transactions) finish.
-	shutdownCtx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), cfg.ShutdownTimeout)
 	defer cancel()
 	return server.Shutdown(shutdownCtx)
-}
-
-func getenv(key, fallback string) string {
-	if v := os.Getenv(key); v != "" {
-		return v
-	}
-	return fallback
 }

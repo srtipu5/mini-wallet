@@ -1,22 +1,19 @@
-// Package application holds the business logic: validation, locking order,
-// balance checks and idempotency. It knows nothing about HTTP.
+// Package application holds the business logic (use cases): validation,
+// locking order, balance checks and idempotency. It knows nothing about HTTP
+// or about which database is used; it only talks to the ports in ports.go.
 package application
 
-import (
-	"context"
-
-	"github.com/jackc/pgx/v5/pgxpool"
-)
+import "context"
 
 type Service struct {
-	db *pgxpool.Pool
+	store Store
 }
 
-func NewService(db *pgxpool.Pool) *Service {
-	return &Service{db: db}
+func NewService(store Store) *Service {
+	return &Service{store: store}
 }
 
 // Ping checks the database connection (used by /health).
 func (s *Service) Ping(ctx context.Context) error {
-	return s.db.Ping(ctx)
+	return s.store.Ping(ctx)
 }

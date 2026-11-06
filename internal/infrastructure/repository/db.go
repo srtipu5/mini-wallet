@@ -1,5 +1,5 @@
-// Package repository contains all SQL. Every function takes a DBTX so it can
-// run either on the pool (simple reads) or inside a transaction (money moves).
+// Package repository is the PostgreSQL implementation of the application
+// ports (see internal/application/ports.go). It contains all SQL.
 package repository
 
 import (
@@ -10,7 +10,8 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 )
 
-// DBTX is satisfied by both *pgxpool.Pool and pgx.Tx.
+// DBTX is satisfied by both *pgxpool.Pool and pgx.Tx, so every repository
+// can run either on the pool or inside a transaction.
 type DBTX interface {
 	Exec(ctx context.Context, sql string, args ...any) (pgconn.CommandTag, error)
 	Query(ctx context.Context, sql string, args ...any) (pgx.Rows, error)

@@ -1,0 +1,40 @@
+package handler
+
+import (
+	"net/http"
+
+	"github.com/srtipu5/mini-wallet/internal/application"
+	"github.com/srtipu5/mini-wallet/internal/utils"
+)
+
+// POST /api/v1/transfers
+func (h *Handler) transfer(w http.ResponseWriter, r *http.Request) {
+	key, err := utils.IdempotencyKey(r)
+	if err != nil {
+		utils.WriteError(w, r, err)
+		return
+	}
+
+	var req transferRequest
+	if err := utils.DecodeJSON(w, r, &req); err != nil {
+		utils.WriteError(w, r, err)
+		return
+	}
+	amount, err := utils.ParseAmount(req.Amount)
+	if err != nil {
+		utils.WriteError(w, r, err)
+		return
+	}
+
+	transfer, replayed, err := h.svc.Transfer(r.Context(), key, application.TransferInput{
+		FromWalletID: req.FromWalletID,
+		ToWalletID:   req.ToWalletID,
+		Amount:       amount,
+		Note:         req.Note,
+	})
+	if err != nil {
+		utils.WriteError(w, r, err)
+		return
+	}
+	utils.WriteIdempotent(w, replayed, transfer)
+}

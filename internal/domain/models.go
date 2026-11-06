@@ -54,3 +54,20 @@ type Transaction struct {
 	ReferenceID          string    `json:"reference_id"`
 	CreatedAt            time.Time `json:"created_at"`
 }
+
+// TransactionFilter selects a page of one wallet's history.
+// From is inclusive, To is exclusive: created_at in [From, To).
+type TransactionFilter struct {
+	WalletID string
+	Type     string     // "" = all types
+	From     *time.Time // nil = no lower bound
+	To       *time.Time // nil = no upper bound
+	Page     int        // 1-based
+	PageSize int
+}
+
+// IdempotencyRecord is an Idempotency-Key that was already used successfully.
+type IdempotencyRecord struct {
+	RequestHash  string
+	ResponseBody []byte
+}
