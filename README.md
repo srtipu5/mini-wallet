@@ -14,53 +14,6 @@ API runs on **http://localhost:8080**. Postgres starts first, and migrations run
 automatically when the API starts.
 
 - After changing the code, rebuild with `docker compose up --build`.
-- To use other host ports: `API_PORT=9090 DB_PORT=5433 docker compose up`.
-
-## Run the tests
-
-**Option A: everything in Docker (no Go needed)**
-
-```bash
-docker compose --profile test run --rm tests
-```
-
-**Option B: with Go 1.25 installed locally**
-
-```bash
-docker compose up -d db
-TEST_DATABASE_URL="postgres://wallet:wallet@localhost:5432/wallet_test?sslmode=disable" \
-  go test -race -count=1 ./...
-```
-
-All tests live in `tests/`, split by kind:
-
-```
-tests/
-  unit/                 no database needed: go test ./tests/unit/...
-    domain/               validation rules, error codes
-    service/              business logic against an in-memory fake repository
-    handler/              routing, request rejection, history query parsing
-    middleware/           panic recovery, request logging
-    utils/                JSON decoding, error-to-status mapping, query parsing
-    config/               environment variables
-  integration/          real HTTP requests against a real Postgres
-```
-
-- **Unit tests** test each layer through its public API only. The service
-  tests use a fake store (`tests/unit/service/fake_store_test.go`) that
-  implements the repository interfaces in memory and imitates rollback. They check
-  balance rules, locking both wallets together, full rollback when any step of a
-  transfer or add-money fails, and idempotency (replay, reuse, released keys).
-- **Integration tests** (`tests/integration/`) cover every rule below, including the
-  concurrency cases: double-spend races, the same idempotency key sent 20 times at
-  once, opposite transfers A→B and B→A and a three-way cycle A→B→C→A at the same
-  time (no deadlock), the same `gateway_ref` sent under different keys, and mixed
-  concurrent operations that must conserve money and keep every wallet's history
-  consistent with its balance. They also check the repository directly: `FOR UPDATE`
-  really blocks a second transaction, and the `CHECK (balance >= 0)` constraint
-  refuses a negative balance even if the service check were skipped. They use a
-  separate database, `wallet_test`, and skip themselves when `TEST_DATABASE_URL` is
-  not set.
 
 ## API
 
@@ -119,6 +72,52 @@ Every error uses the same envelope: `{"error": {"code": "...", "message": "..."}
 | `IDEMPOTENCY_KEY_REUSED` | 422 | The same key was sent with a different request body |
 | `NOT_FOUND` | 404 | Unknown route |
 | `INTERNAL_ERROR` | 500 | Unexpected failure. Details are logged, never returned to the client |
+
+## Run the tests
+
+**Option A: everything in Docker (no Go needed)**
+
+```bash
+docker compose --profile test run --rm tests
+```
+
+**Option B: with Go 1.25 installed locally**
+
+```bash
+docker compose up -d db
+TEST_DATABASE_URL="postgres://wallet:wallet@localhost:5432/wallet_test?sslmode=disable" \
+  go test -race -count=1 ./...
+```
+
+All tests live in `tests/`, split by kind:
+
+```
+tests/
+  unit/                 no database needed: go test ./tests/unit/...
+    domain/               validation rules, error codes
+    service/              business logic against an in-memory fake repository
+    handler/              routing, request rejection, history query parsing
+    middleware/           panic recovery, request logging
+    utils/                JSON decoding, error-to-status mapping, query parsing
+    config/               environment variables
+  integration/          real HTTP requests against a real Postgres
+```
+
+- **Unit tests** test each layer through its public API only. The service
+  tests use a fake store (`tests/unit/service/fake_store_test.go`) that
+  implements the repository interfaces in memory and imitates rollback. They check
+  balance rules, locking both wallets together, full rollback when any step of a
+  transfer or add-money fails, and idempotency (replay, reuse, released keys).
+- **Integration tests** (`tests/integration/`) cover every rule below, including the
+  concurrency cases: double-spend races, the same idempotency key sent 20 times at
+  once, opposite transfers A→B and B→A and a three-way cycle A→B→C→A at the same
+  time (no deadlock), the same `gateway_ref` sent under different keys, and mixed
+  concurrent operations that must conserve money and keep every wallet's history
+  consistent with its balance. They also check the repository directly: `FOR UPDATE`
+  really blocks a second transaction, and the `CHECK (balance >= 0)` constraint
+  refuses a negative balance even if the service check were skipped. They use a
+  separate database, `wallet_test`, and skip themselves when `TEST_DATABASE_URL` is
+  not set.
 
 ## How money safety works
 
