@@ -6,12 +6,15 @@ transfers, and view transaction history. It is written in Go with PostgreSQL.
 ## Run it
 
 ```bash
-make up          # or: docker compose up --build
+docker compose up
 ```
 
-The API runs on **http://localhost:8080**. Postgres starts first, and migrations
-run automatically when the API starts. To use other host ports, set them first:
-`API_PORT=9090 DB_PORT=5433 make up`.
+That is the only command needed. The API image is built on the first run, and the
+API runs on **http://localhost:8080**. Postgres starts first, and migrations run
+automatically when the API starts.
+
+- After changing the code, rebuild with `docker compose up --build` (or `make up`).
+- To use other host ports: `API_PORT=9090 DB_PORT=5433 docker compose up`.
 
 ## Make commands
 
