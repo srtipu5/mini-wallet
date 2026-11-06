@@ -482,11 +482,11 @@ tests/
   integration/             real HTTP requests against a real PostgreSQL
 ```
 
-## Not built on purpose (possible next steps)
+## Future improvements
 
-The assignment asks for a small, correct wallet core. I kept the scope to exactly
-that and avoided over-engineering. These are the things I would add in a real
-product, and how:
+The assignment asks for a small, correct wallet core, so I tried to keep the scope
+focused on that and avoid over-engineering. In a real product, the following could
+be useful additions, and here is how they might be approached:
 
 - **Notifications (SMS or push).** After add money, the wallet owner gets a message.
   After a transfer, both the sender (money sent) and the receiver (money received)
