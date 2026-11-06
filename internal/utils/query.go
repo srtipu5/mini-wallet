@@ -9,8 +9,8 @@ import (
 	"github.com/srtipu5/mini-wallet/internal/domain"
 )
 
-// BangladeshTime is used for date-only values like 2026-11-05 (UTC+6, no DST).
-var BangladeshTime = time.FixedZone("Asia/Dhaka", 6*60*60)
+// bangladeshTime is used for date-only values like 2026-11-05 (UTC+6, no DST).
+var bangladeshTime = time.FixedZone("Asia/Dhaka", 6*60*60)
 
 // QueryInt reads an optional integer query parameter within [min, max].
 func QueryInt(q url.Values, name string, def, min, max int) (int, error) {
@@ -39,7 +39,7 @@ func QueryTime(q url.Values, name string, isUpperBound bool) (*time.Time, error)
 	if t, err := time.Parse(time.RFC3339Nano, raw); err == nil {
 		return &t, nil
 	}
-	if d, err := time.ParseInLocation(time.DateOnly, raw, BangladeshTime); err == nil {
+	if d, err := time.ParseInLocation(time.DateOnly, raw, bangladeshTime); err == nil {
 		if isUpperBound {
 			d = d.AddDate(0, 0, 1)
 		}

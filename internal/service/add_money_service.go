@@ -9,7 +9,6 @@ import (
 )
 
 // AddMoney credits a wallet after a (simulated) payment-gateway confirmation.
-//
 // Validation runs first, outside the database. The credit runs inside ONE
 // database transaction opened by runIdempotent (see addMoneyInTx).
 func (s *Service) AddMoney(ctx context.Context, idempotencyKey string, in dto.AddMoneyInput) (dto.AddMoneyResult, bool, error) {
