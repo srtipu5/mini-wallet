@@ -1,0 +1,51 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: wallet
+      POSTGRES_PASSWORD: wallet
+      POSTGRES_DB: wallet
+    ports:
+      - "${DB_PORT:-5432}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      # Creates the separate "wallet_test" database used by the test suite.
+      - ./scripts/init-test-db.sql:/docker-entrypoint-initdb.d/init-test-db.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U wallet -d wallet"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  api:
+    build: .
+    environment:
+      DATABASE_URL: postgres://wallet:wallet@db:5432/wallet?sslmode=disable
+      PORT: "8080"
+    ports:
+      - "${API_PORT:-8080}:8080"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  # Runs the full test suite (unit + integration + concurrency) in a container:
+  #   docker compose --profile test run --rm tests
+  tests:
+    profiles: ["test"]
+    image: golang:1.25
+    working_dir: /app
+    volumes:
+      - .:/app
+      - gocache:/root/.cache/go-build
+      - gomod:/go/pkg/mod
+    environment:
+      TEST_DATABASE_URL: postgres://wallet:wallet@db:5432/wallet_test?sslmode=disable
+    command: ["go", "test", "-race", "-count=1", "./..."]
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  pgdata:
+  gocache:
+  gomod:

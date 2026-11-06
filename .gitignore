@@ -1,0 +1,6 @@
+/mini-wallet
+/bin/
+*.out
+.env
+.idea/
+.vscode/
