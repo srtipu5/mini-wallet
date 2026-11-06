@@ -27,11 +27,11 @@ func IdempotencyKey(r *http.Request) (string, error) {
 func ParseAmount(raw json.RawMessage) (int64, error) {
 	s := strings.TrimSpace(string(raw))
 	if s == "" || s == "null" {
-		return 0, domain.NewError(domain.CodeInvalidAmount, "amount is required")
+		return 0, domain.NewError(domain.CodeInvalidAmount, "Amount is required")
 	}
 	n, err := strconv.ParseInt(s, 10, 64)
 	if err != nil {
-		return 0, domain.NewError(domain.CodeInvalidAmount, "amount must be an integer number of poisha")
+		return 0, domain.NewError(domain.CodeInvalidAmount, "Amount must be an integer number of poisha")
 	}
 	return n, nil
 }

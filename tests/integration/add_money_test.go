@@ -152,3 +152,32 @@ func TestAddMoney_ConcurrentSameGatewayRef(t *testing.T) {
 		t.Fatalf("successes=%d balance=%d; want 1 and 1000", ok, balanceOf(t, id))
 	}
 }
+
+// The two limits give different messages, so the client knows which one it broke.
+func TestAmountLimitMessages(t *testing.T) {
+	resetDB(t)
+	a := createWallet(t, "u_a")
+	b := createWallet(t, "u_b")
+	addMoney(t, a, 5000)
+
+	cases := []struct {
+		name string
+		r    response
+		msg  string
+	}{
+		{"add money below min", call(t, "POST", addMoneyPath(a), `{"amount":99,"gateway_ref":"GW-1"}`, "k1"),
+			"Amount must be at least 100 poisha (1 BDT)."},
+		{"add money above max", call(t, "POST", addMoneyPath(a), `{"amount":2500001,"gateway_ref":"GW-2"}`, "k2"),
+			"Amount must not exceed 2500000 poisha (25000 BDT)."},
+		{"transfer below min", transfer(t, a, b, 50, "k3"),
+			"Amount must be at least 100 poisha (1 BDT)."},
+		{"transfer above max", transfer(t, a, b, 2500001, "k4"),
+			"Amount must not exceed 2500000 poisha (25000 BDT)."},
+	}
+	for _, c := range cases {
+		expectError(t, c.r, 400, "INVALID_AMOUNT")
+		if got := c.r.JSON(t)["error"].(map[string]any)["message"]; got != c.msg {
+			t.Errorf("%s: message = %q, want %q", c.name, got, c.msg)
+		}
+	}
+}

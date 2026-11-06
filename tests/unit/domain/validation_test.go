@@ -7,26 +7,33 @@ import (
 )
 
 func TestValidateAmount(t *testing.T) {
+	const (
+		tooSmall = "Amount must be at least 100 poisha (1 BDT)"
+		tooLarge = "Amount must not exceed 2500000 poisha (25000 BDT)"
+	)
 	cases := []struct {
 		amount int64
-		ok     bool
+		msg    string // "" = valid
 	}{
-		{-100, false},
-		{0, false},
-		{99, false},
-		{100, true},       // minimum
-		{2_500_000, true}, // maximum
-		{2_500_001, false},
+		{-100, tooSmall},
+		{0, tooSmall},
+		{99, tooSmall},
+		{100, ""},       // minimum
+		{2_500_000, ""}, // maximum
+		{2_500_001, tooLarge},
+		{9_000_000_000, tooLarge},
 	}
 	for _, c := range cases {
 		err := domain.ValidateAmount(c.amount)
-		if (err == nil) != c.ok {
-			t.Errorf("ValidateAmount(%d): got err=%v, want ok=%v", c.amount, err, c.ok)
-		}
-		if err != nil {
-			if e, _ := domain.AsError(err); e.Code != domain.CodeInvalidAmount {
-				t.Errorf("ValidateAmount(%d): code %s, want %s", c.amount, e.Code, domain.CodeInvalidAmount)
+		if c.msg == "" {
+			if err != nil {
+				t.Errorf("ValidateAmount(%d): unexpected error %v", c.amount, err)
 			}
+			continue
+		}
+		e, ok := domain.AsError(err)
+		if !ok || e.Code != domain.CodeInvalidAmount || e.Message != c.msg {
+			t.Errorf("ValidateAmount(%d) = %v; want INVALID_AMOUNT %q", c.amount, err, c.msg)
 		}
 	}
 }

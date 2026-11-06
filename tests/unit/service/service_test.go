@@ -405,11 +405,11 @@ func TestTransfer_ValidationNeverOpensTransaction(t *testing.T) {
 		{"malformed sender", func(_, b string) dto.TransferInput {
 			return dto.TransferInput{FromWalletID: "x", ToWalletID: b, Amount: 1000}
 		},
-			domain.CodeWalletNotFound, "sender wallet not found"},
+			domain.CodeWalletNotFound, "Sender wallet not found"},
 		{"malformed receiver", func(a, _ string) dto.TransferInput {
 			return dto.TransferInput{FromWalletID: a, ToWalletID: "x", Amount: 1000}
 		},
-			domain.CodeWalletNotFound, "receiver wallet not found"},
+			domain.CodeWalletNotFound, "Receiver wallet not found"},
 		{"amount below min", func(a, b string) dto.TransferInput {
 			return dto.TransferInput{FromWalletID: a, ToWalletID: b, Amount: 99}
 		},
@@ -450,13 +450,13 @@ func TestTransfer_UnknownWallets(t *testing.T) {
 
 	_, _, err := svc.Transfer(ctx, "k1", dto.TransferInput{FromWalletID: unknownWalletID, ToWalletID: a.ID, Amount: 1000})
 	expectCode(t, err, domain.CodeWalletNotFound)
-	if e, _ := domain.AsError(err); e.Message != "sender wallet not found" {
+	if e, _ := domain.AsError(err); e.Message != "Sender wallet not found" {
 		t.Fatalf("message = %q", e.Message)
 	}
 
 	_, _, err = svc.Transfer(ctx, "k2", dto.TransferInput{FromWalletID: a.ID, ToWalletID: unknownWalletID, Amount: 1000})
 	expectCode(t, err, domain.CodeWalletNotFound)
-	if e, _ := domain.AsError(err); e.Message != "receiver wallet not found" {
+	if e, _ := domain.AsError(err); e.Message != "Receiver wallet not found" {
 		t.Fatalf("message = %q", e.Message)
 	}
 
@@ -560,7 +560,7 @@ func TestTransfer_BothWalletsUnknown(t *testing.T) {
 	other := "00000000-0000-4000-8000-888888888888"
 	_, _, err := svc.Transfer(ctx, "k", dto.TransferInput{FromWalletID: unknownWalletID, ToWalletID: other, Amount: 1000})
 	expectCode(t, err, domain.CodeWalletNotFound)
-	if e, _ := domain.AsError(err); e.Message != "sender wallet not found" {
+	if e, _ := domain.AsError(err); e.Message != "Sender wallet not found" {
 		t.Fatalf("message = %q, want sender wallet not found", e.Message)
 	}
 	if len(f.idem) != 0 {

@@ -55,11 +55,11 @@ func TestSendError_StatusForEveryCode(t *testing.T) {
 	}
 	for code, status := range want {
 		rec := httptest.NewRecorder()
-		utils.SendError(rec, httptest.NewRequest("GET", "/", nil), domain.NewError(code, "msg "+code))
+		utils.SendError(rec, httptest.NewRequest("GET", "/", nil), domain.NewError(code, "Msg "+code))
 		if rec.Code != status {
 			t.Errorf("%s: status = %d, want %d", code, rec.Code, status)
 		}
-		if d := decodeError(t, rec); d.Code != code || d.Message != "msg "+code {
+		if d := decodeError(t, rec); d.Code != code || d.Message != "Msg "+code+"." {
 			t.Errorf("%s: body = %+v", code, d)
 		}
 	}
@@ -89,7 +89,7 @@ func TestSendError_InternalErrorHidesDetails(t *testing.T) {
 		t.Fatalf("status = %d, want 500", rec.Code)
 	}
 	d := decodeError(t, rec)
-	if d.Code != domain.CodeInternal || d.Message != "internal server error" || strings.Contains(rec.Body.String(), "password") {
+	if d.Code != domain.CodeInternal || d.Message != "Internal server error." || strings.Contains(rec.Body.String(), "password") {
 		t.Fatalf("leaked or wrong body: %s", rec.Body)
 	}
 }
@@ -113,5 +113,28 @@ func TestSendIdempotent(t *testing.T) {
 	utils.SendIdempotent(rec, true, map[string]string{"id": "1"})
 	if rec.Code != http.StatusCreated || rec.Header().Get("Idempotent-Replayed") != "true" {
 		t.Fatalf("replay: %d header=%q", rec.Code, rec.Header().Get("Idempotent-Replayed"))
+	}
+}
+
+// Every error message sent to a client is a sentence: capital first letter
+// and a full stop at the end, whatever the code that created it wrote.
+func TestSendError_FormatsMessageAsSentence(t *testing.T) {
+	cases := map[string]string{
+		"wallet not found":                    "Wallet not found.",
+		"Wallet not found":                    "Wallet not found.",
+		"Already a sentence.":                 "Already a sentence.",
+		"Amount must be at least 100 (1 BDT)": "Amount must be at least 100 (1 BDT).",
+		`Unknown field "admin"`:               `Unknown field "admin".`,
+		"  padded message  ":                  "Padded message.",
+		"élan is lowercase":                   "Élan is lowercase.",
+		"Really?":                             "Really?",
+		"":                                    "",
+	}
+	for in, want := range cases {
+		rec := httptest.NewRecorder()
+		utils.SendError(rec, httptest.NewRequest("GET", "/", nil), domain.NewError(domain.CodeValidation, in))
+		if got := decodeError(t, rec).Message; got != want {
+			t.Errorf("message %q sent as %q, want %q", in, got, want)
+		}
 	}
 }

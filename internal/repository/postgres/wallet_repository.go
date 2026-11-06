@@ -34,9 +34,9 @@ func (r *walletRepository) Create(ctx context.Context, userID, phone string) (do
 
 	switch {
 	case pgErrorIs(err, pgUniqueViolation, "wallets_user_id_key"):
-		return w, domain.NewError(domain.CodeDuplicateWallet, "this user already has a wallet")
+		return w, domain.NewError(domain.CodeDuplicateWallet, "This user already has a wallet")
 	case pgErrorIs(err, pgUniqueViolation, "wallets_phone_key"):
-		return w, domain.NewError(domain.CodeDuplicateWallet, "a wallet with this phone already exists")
+		return w, domain.NewError(domain.CodeDuplicateWallet, "A wallet with this phone already exists")
 	}
 	return w, err
 }

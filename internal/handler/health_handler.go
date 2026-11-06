@@ -18,5 +18,5 @@ func (h *Handler) Health(w http.ResponseWriter, r *http.Request) {
 
 // Fallback for unknown routes.
 func (h *Handler) NotFound(w http.ResponseWriter, r *http.Request) {
-	utils.SendError(w, r, domain.NewError(domain.CodeNotFound, "route not found"))
+	utils.SendError(w, r, domain.NewError(domain.CodeNotFound, "Route not found"))
 }

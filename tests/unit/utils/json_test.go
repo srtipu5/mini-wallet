@@ -32,12 +32,12 @@ func TestDecodeJSON_Invalid(t *testing.T) {
 		body string
 		msg  string
 	}{
-		"empty body":    {``, "request body is required"},
-		"malformed":     {`{"name":`, "request body is not valid JSON"},
-		"syntax error":  {`{name}`, "request body is not valid JSON"},
-		"wrong type":    {`{"count":"two"}`, `field "count" has the wrong type`},
+		"empty body":    {``, "Request body is required"},
+		"malformed":     {`{"name":`, "Request body is not valid JSON"},
+		"syntax error":  {`{name}`, "Request body is not valid JSON"},
+		"wrong type":    {`{"count":"two"}`, `Field "count" has the wrong type`},
 		"not an object": {`[1,2]`, "has the wrong type"},
-		"unknown field": {`{"name":"a","admin":true}`, `unknown field "admin"`},
+		"unknown field": {`{"name":"a","admin":true}`, `Unknown field "admin"`},
 		"trailing data": {`{"name":"a"} {"name":"b"}`, "single JSON object"},
 		"trailing junk": {`{"name":"a"} x`, "single JSON object"},
 		"too large":     {`{"name":"` + strings.Repeat("x", 1<<20) /* body limit is 1 MB */ + `"}`, "too large"},

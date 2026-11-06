@@ -20,7 +20,7 @@ func QueryInt(q url.Values, name string, def, min, max int) (int, error) {
 	}
 	n, err := strconv.Atoi(raw)
 	if err != nil || n < min || n > max {
-		return 0, domain.Validation(name + " must be an integer between " + strconv.Itoa(min) + " and " + strconv.Itoa(max))
+		return 0, domain.Validation("The " + name + " parameter must be an integer between " + strconv.Itoa(min) + " and " + strconv.Itoa(max))
 	}
 	return n, nil
 }
@@ -45,5 +45,5 @@ func QueryTime(q url.Values, name string, isUpperBound bool) (*time.Time, error)
 		}
 		return &d, nil
 	}
-	return nil, domain.Validation(name + " must be an ISO-8601 date (2026-11-05) or date-time (2026-11-05T10:00:00Z)")
+	return nil, domain.Validation("The " + name + " parameter must be an ISO-8601 date (2026-11-05) or date-time (2026-11-05T10:00:00Z)")
 }

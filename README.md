@@ -108,7 +108,8 @@ with the header `Idempotent-Replayed: true`. The wallet is not credited twice.
 | Same `Idempotency-Key`, different body | 422 | `IDEMPOTENCY_KEY_REUSED` |
 | Same `gateway_ref` under a new key (or another wallet) | 409 | `DUPLICATE_GATEWAY_REF` |
 | `"amount": 100.5`, `1e3` or `"500"` | 400 | `INVALID_AMOUNT` |
-| `"amount": 99` or more than `2500000` | 400 | `INVALID_AMOUNT` |
+| `"amount": 99` (below the minimum) | 400 | `INVALID_AMOUNT`: "Amount must be at least 100 poisha (1 BDT)." |
+| `"amount": 2500001` (above the maximum) | 400 | `INVALID_AMOUNT`: "Amount must not exceed 2500000 poisha (25000 BDT)." |
 | No `Idempotency-Key` header | 400 | `MISSING_IDEMPOTENCY_KEY` |
 
 #### Transfer money
@@ -210,17 +211,27 @@ curl 'localhost:8080/api/v1/wallets/971c93db-dd20-4571-801d-433fb86456e3/transac
 
 ```bash
 curl localhost:8080/health          # 200 {"status":"ok"}
-curl localhost:8080/api/v1/nope     # 404 {"error":{"code":"NOT_FOUND","message":"route not found"}}
+curl localhost:8080/api/v1/nope     # 404 {"error":{"code":"NOT_FOUND","message":"Route not found."}}
 ```
 
 ### Errors
 
-Every error uses the same envelope: `{"error": {"code": "...", "message": "..."}}`.
+Every error uses the same envelope. The `code` is stable and meant for programs;
+the `message` is a sentence for people (capital first letter, full stop at the end):
+
+```json
+{
+  "error": {
+    "code": "INSUFFICIENT_BALANCE",
+    "message": "Wallet does not have enough balance for this transfer."
+  }
+}
+```
 
 | Code | HTTP | When |
 |---|---|---|
 | `VALIDATION_ERROR` | 400 | Bad JSON, missing or invalid fields, unknown fields, bad query parameters |
-| `INVALID_AMOUNT` | 400 | Amount is not an integer, or is outside 100–2,500,000 |
+| `INVALID_AMOUNT` | 400 | Amount is not an integer, is below 100, or is above 2,500,000. The message says which |
 | `MISSING_IDEMPOTENCY_KEY` | 400 | The `Idempotency-Key` header is missing or empty |
 | `SAME_WALLET_TRANSFER` | 400 | `from_wallet_id` equals `to_wallet_id` |
 | `WALLET_NOT_FOUND` | 404 | The wallet does not exist (a malformed id is also reported as not found) |

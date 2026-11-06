@@ -29,22 +29,22 @@ func (s *Service) Transfer(ctx context.Context, idempotencyKey string, in dto.Tr
 
 func validateTransfer(in dto.TransferInput) error {
 	if in.FromWalletID == "" || in.ToWalletID == "" {
-		return domain.Validation("from_wallet_id and to_wallet_id are required")
+		return domain.Validation("The from_wallet_id and to_wallet_id fields are required")
 	}
 	if in.FromWalletID == in.ToWalletID {
 		return domain.ErrSameWalletTransfer
 	}
 	if !domain.IsValidWalletID(in.FromWalletID) {
-		return domain.NewError(domain.CodeWalletNotFound, "sender wallet not found")
+		return domain.NewError(domain.CodeWalletNotFound, "Sender wallet not found")
 	}
 	if !domain.IsValidWalletID(in.ToWalletID) {
-		return domain.NewError(domain.CodeWalletNotFound, "receiver wallet not found")
+		return domain.NewError(domain.CodeWalletNotFound, "Receiver wallet not found")
 	}
 	if err := domain.ValidateAmount(in.Amount); err != nil {
 		return err
 	}
 	if in.Note != nil && len([]rune(*in.Note)) > domain.MaxNoteLength {
-		return domain.Validation("note must be at most 255 characters")
+		return domain.Validation("Note must be at most 255 characters")
 	}
 	return nil
 }
@@ -58,10 +58,10 @@ func executeTransfer(ctx context.Context, r Repositories, in dto.TransferInput) 
 		return domain.Transfer{}, err
 	}
 	if _, ok := balances[in.FromWalletID]; !ok {
-		return domain.Transfer{}, domain.NewError(domain.CodeWalletNotFound, "sender wallet not found")
+		return domain.Transfer{}, domain.NewError(domain.CodeWalletNotFound, "Sender wallet not found")
 	}
 	if _, ok := balances[in.ToWalletID]; !ok {
-		return domain.Transfer{}, domain.NewError(domain.CodeWalletNotFound, "receiver wallet not found")
+		return domain.Transfer{}, domain.NewError(domain.CodeWalletNotFound, "Receiver wallet not found")
 	}
 
 	// 2. Check the balance. Safe because nobody else can change it while we hold the lock.

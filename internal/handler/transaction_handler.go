@@ -32,7 +32,7 @@ func parseTransactionFilter(q url.Values) (domain.TransactionFilter, error) {
 
 	if t := strings.ToUpper(strings.TrimSpace(q.Get("type"))); t != "" {
 		if !domain.IsValidTransactionType(t) {
-			return f, domain.Validation("type must be one of ADD_MONEY, TRANSFER_OUT, TRANSFER_IN")
+			return f, domain.Validation("The type parameter must be one of ADD_MONEY, TRANSFER_OUT, TRANSFER_IN")
 		}
 		f.Type = t
 	}
@@ -52,7 +52,7 @@ func parseTransactionFilter(q url.Values) (domain.TransactionFilter, error) {
 		return f, err
 	}
 	if f.From != nil && f.To != nil && !f.From.Before(*f.To) {
-		return f, domain.Validation("from must be before to")
+		return f, domain.Validation("The from date must be before the to date")
 	}
 	return f, nil
 }

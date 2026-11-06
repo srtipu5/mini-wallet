@@ -38,17 +38,23 @@ var phonePattern = regexp.MustCompile(`^01[3-9][0-9]{8}$`)
 // uuidPattern matches the canonical 8-4-4-4-12 hex format.
 var uuidPattern = regexp.MustCompile(`^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$`)
 
+// ValidateAmount checks the per-transaction limits. Both cases use the
+// INVALID_AMOUNT code; the message says which limit was broken.
 func ValidateAmount(amount int64) error {
-	if amount < MinAmount || amount > MaxAmount {
+	if amount < MinAmount {
 		return NewError(CodeInvalidAmount,
-			fmt.Sprintf("amount must be an integer between %d and %d poisha", MinAmount, MaxAmount))
+			fmt.Sprintf("Amount must be at least %d poisha (%d BDT)", MinAmount, MinAmount/100))
+	}
+	if amount > MaxAmount {
+		return NewError(CodeInvalidAmount,
+			fmt.Sprintf("Amount must not exceed %d poisha (%d BDT)", MaxAmount, MaxAmount/100))
 	}
 	return nil
 }
 
 func ValidatePhone(phone string) error {
 	if !phonePattern.MatchString(phone) {
-		return Validation("phone must be a valid Bangladeshi mobile number like 01711000001")
+		return Validation("Phone must be a valid Bangladeshi mobile number like 01711000001")
 	}
 	return nil
 }
@@ -56,10 +62,10 @@ func ValidatePhone(phone string) error {
 // ValidateText checks a required free-text field (non-blank, max length).
 func ValidateText(field, value string, maxLen int) error {
 	if strings.TrimSpace(value) == "" {
-		return Validation(field + " is required")
+		return Validation("The " + field + " field is required")
 	}
 	if utf8.RuneCountInString(value) > maxLen {
-		return Validation(fmt.Sprintf("%s must be at most %d characters", field, maxLen))
+		return Validation(fmt.Sprintf("The %s field must be at most %d characters", field, maxLen))
 	}
 	return nil
 }

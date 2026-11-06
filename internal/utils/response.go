@@ -7,6 +7,9 @@ import (
 	"encoding/json"
 	"log/slog"
 	"net/http"
+	"strings"
+	"unicode"
+	"unicode/utf8"
 
 	"github.com/srtipu5/mini-wallet/internal/domain"
 )
@@ -51,7 +54,7 @@ func SendError(w http.ResponseWriter, r *http.Request, err error) {
 		if !known {
 			status = http.StatusBadRequest
 		}
-		SendData(w, status, ErrorBody{ErrorDetail{e.Code, e.Message}})
+		SendData(w, status, ErrorBody{ErrorDetail{e.Code, formatMessage(e.Message)}})
 		return
 	}
 
@@ -62,7 +65,7 @@ func SendError(w http.ResponseWriter, r *http.Request, err error) {
 // SendInternalError writes a generic 500 without any details.
 func SendInternalError(w http.ResponseWriter) {
 	SendData(w, http.StatusInternalServerError,
-		ErrorBody{ErrorDetail{domain.CodeInternal, "internal server error"}})
+		ErrorBody{ErrorDetail{domain.CodeInternal, "Internal server error."}})
 }
 
 // SendIdempotent writes a 201 for an idempotent operation and marks replays
@@ -72,4 +75,20 @@ func SendIdempotent(w http.ResponseWriter, replayed bool, v any) {
 		w.Header().Set("Idempotent-Replayed", "true")
 	}
 	SendData(w, http.StatusCreated, v)
+}
+
+// formatMessage gives every error message sent to clients the same style:
+// a sentence that starts with a capital letter and ends with a full stop,
+// e.g. "Wallet does not have enough balance for this transfer."
+func formatMessage(s string) string {
+	s = strings.TrimSpace(s)
+	r, size := utf8.DecodeRuneInString(s)
+	if r == utf8.RuneError {
+		return s
+	}
+	s = string(unicode.ToUpper(r)) + s[size:]
+	if !strings.HasSuffix(s, ".") && !strings.HasSuffix(s, "!") && !strings.HasSuffix(s, "?") {
+		s += "."
+	}
+	return s
 }

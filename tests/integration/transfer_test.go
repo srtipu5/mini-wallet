@@ -236,8 +236,8 @@ func TestTransfer_NotFoundSaysWhichWallet(t *testing.T) {
 	missing := "00000000-0000-0000-0000-000000000000"
 
 	for _, c := range []struct{ from, to, want string }{
-		{missing, a, "sender wallet not found"},
-		{a, missing, "receiver wallet not found"},
+		{missing, a, "Sender wallet not found."},
+		{a, missing, "Receiver wallet not found."},
 	} {
 		r := transfer(t, c.from, c.to, 1000, randKey())
 		expectError(t, r, 404, "WALLET_NOT_FOUND")

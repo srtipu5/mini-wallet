@@ -26,22 +26,22 @@ func DecodeJSON(w http.ResponseWriter, r *http.Request, dst any) error {
 		var sizeErr *http.MaxBytesError
 		switch {
 		case errors.Is(err, io.EOF):
-			return domain.Validation("request body is required")
+			return domain.Validation("Request body is required")
 		case errors.As(err, &syntaxErr), errors.Is(err, io.ErrUnexpectedEOF):
-			return domain.Validation("request body is not valid JSON")
+			return domain.Validation("Request body is not valid JSON")
 		case errors.As(err, &typeErr):
-			return domain.Validation(fmt.Sprintf("field %q has the wrong type", typeErr.Field))
+			return domain.Validation(fmt.Sprintf("Field %q has the wrong type", typeErr.Field))
 		case errors.As(err, &sizeErr):
-			return domain.Validation("request body is too large")
+			return domain.Validation("Request body is too large")
 		case strings.HasPrefix(err.Error(), "json: unknown field"):
-			return domain.Validation(strings.TrimPrefix(err.Error(), "json: "))
+			return domain.Validation("Unknown field " + strings.TrimPrefix(err.Error(), "json: unknown field "))
 		default:
-			return domain.Validation("invalid request body")
+			return domain.Validation("Invalid request body")
 		}
 	}
 
 	if dec.Decode(&struct{}{}) != io.EOF {
-		return domain.Validation("request body must contain a single JSON object")
+		return domain.Validation("Request body must contain a single JSON object")
 	}
 	return nil
 }
