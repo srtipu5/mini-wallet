@@ -25,17 +25,15 @@ func scanWallet(row pgx.Row) (domain.Wallet, error) {
 	return w, err
 }
 
-// Create inserts a wallet. The UNIQUE constraints on user_id and phone
-// make duplicates impossible, even when two requests race.
 func (r *walletRepository) Create(ctx context.Context, userID, phone string) (domain.Wallet, error) {
 	w, err := scanWallet(r.db.QueryRow(ctx,
 		`INSERT INTO wallets (user_id, phone) VALUES ($1, $2) RETURNING `+walletColumns,
 		userID, phone))
 
 	switch {
-	case pgErrorIs(err, pgUniqueViolation, "wallets_user_id_key"):
+	case isPgError(err, pgUniqueViolation, "wallets_user_id_key"):
 		return w, domain.NewError(domain.CodeDuplicateWallet, "This user already has a wallet")
-	case pgErrorIs(err, pgUniqueViolation, "wallets_phone_key"):
+	case isPgError(err, pgUniqueViolation, "wallets_phone_key"):
 		return w, domain.NewError(domain.CodeDuplicateWallet, "A wallet with this phone already exists")
 	}
 	return w, err
@@ -50,8 +48,6 @@ func (r *walletRepository) Get(ctx context.Context, id string) (domain.Wallet, e
 	return w, err
 }
 
-// List returns one page of wallets, newest first. id breaks ties between
-// wallets created at the same moment, so the order is always stable.
 func (r *walletRepository) List(ctx context.Context, page, pageSize int) ([]domain.Wallet, int, error) {
 	var total int
 	if err := r.db.QueryRow(ctx, `SELECT count(*) FROM wallets`).Scan(&total); err != nil {
@@ -72,13 +68,7 @@ func (r *walletRepository) List(ctx context.Context, page, pageSize int) ([]doma
 	return wallets, total, err
 }
 
-// LockBalances locks the given wallets and returns their balances by id.
-//
-// ORDER BY id makes Postgres lock the rows in id order. Every transfer locks
-// its two wallets in that same order, so A->B and B->A (or any cycle such as
-// A->B, B->C, C->A) running at the same time wait for each other instead of
-// deadlocking. Other transactions that want to change these wallets wait
-// until ours commits or rolls back.
+// LockBalances locks rows in id order so concurrent transfers cannot deadlock.
 func (r *walletRepository) LockBalances(ctx context.Context, ids ...string) (map[string]int64, error) {
 	rows, err := r.db.Query(ctx,
 		`SELECT id::text, balance FROM wallets
@@ -102,9 +92,7 @@ func (r *walletRepository) LockBalances(ctx context.Context, ids ...string) (map
 	return balances, rows.Err()
 }
 
-// ChangeBalance adds delta (positive or negative) to the balance and returns
-// the new balance. The UPDATE itself locks the row.
-func (r *walletRepository) ChangeBalance(ctx context.Context, id string, delta int64) (int64, error) {
+func (r *walletRepository) AdjustBalance(ctx context.Context, id string, delta int64) (int64, error) {
 	var balance int64
 	err := r.db.QueryRow(ctx,
 		`UPDATE wallets SET balance = balance + $2, updated_at = now() WHERE id = $1 RETURNING balance`,
@@ -113,8 +101,8 @@ func (r *walletRepository) ChangeBalance(ctx context.Context, id string, delta i
 	switch {
 	case errors.Is(err, pgx.ErrNoRows):
 		return 0, domain.ErrWalletNotFound
-	case pgErrorIs(err, pgCheckViolation, "wallets_balance_non_negative"):
-		// Should never happen because the service checks first; the DB is the safety net.
+	case isPgError(err, pgCheckViolation, "wallets_balance_non_negative"):
+		// Safety net: the service checks the balance first.
 		return 0, domain.ErrInsufficientBalance
 	}
 	return balance, err

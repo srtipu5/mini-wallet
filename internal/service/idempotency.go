@@ -14,67 +14,47 @@ const (
 	scopeTransfer = "transfer"
 )
 
-// runIdempotent runs work inside ONE database transaction, at most once per
-// (scope, key):
-//
-//	BEGIN
-//	  1. claim the key      INSERT INTO idempotency_keys ... ON CONFLICT DO NOTHING
-//	  2. key already used?  same request -> return the saved response (replay)
-//	                        other request -> IDEMPOTENCY_KEY_REUSED
-//	  3. do the work        e.g. the transfer (all its SQL uses the same tx)
-//	  4. save the response  UPDATE idempotency_keys SET response_body = ...
-//	COMMIT    -- or ROLLBACK if any step returns an error
-//
-// The key and the money movement commit together, so a crash can never leave
-// "money moved but key not saved", or the other way round. If the work fails,
-// the key is rolled back too, so the client can safely retry with it.
-func runIdempotent[T any](
+// withIdempotency runs fn at most once per (scope, key) and replays the saved
+// response on retries. It must run inside the caller's transaction so the key
+// and the work commit or roll back together.
+func withIdempotency[T any](
 	ctx context.Context,
-	store Store,
+	repos Repositories,
 	scope, key string,
 	request any,
-	work func(tx Repositories) (T, error),
+	fn func() (T, error),
 ) (result T, replayed bool, err error) {
 	hash, err := hashRequest(request)
 	if err != nil {
 		return result, false, err
 	}
 
-	err = store.WithinTx(ctx, func(tx Repositories) error {
-		// 1. Claim the key. A concurrent request with the same key waits here
-		//    until our transaction finishes.
-		existing, err := tx.Idempotency.Claim(ctx, scope, key, hash)
-		if err != nil {
-			return err
+	// Blocks while another in-flight request holds the same key.
+	existing, err := repos.Idempotency.Claim(ctx, scope, key, hash)
+	if err != nil {
+		return result, false, err
+	}
+	if existing != nil {
+		if existing.RequestHash != hash {
+			return result, false, domain.ErrIdempotencyKeyReused
 		}
+		if err := json.Unmarshal(existing.ResponseBody, &result); err != nil {
+			return result, false, err
+		}
+		return result, true, nil
+	}
 
-		// 2. Key already used: reject a different request, replay the same one.
-		if existing != nil {
-			if existing.RequestHash != hash {
-				return domain.ErrIdempotencyKeyReused
-			}
-			replayed = true
-			return json.Unmarshal(existing.ResponseBody, &result)
-		}
+	if result, err = fn(); err != nil {
+		return result, false, err
+	}
 
-		// 3. Do the work.
-		result, err = work(tx)
-		if err != nil {
-			return err
-		}
-
-		// 4. Save the response, so a retry gets exactly the same answer.
-		body, err := json.Marshal(result)
-		if err != nil {
-			return err
-		}
-		return tx.Idempotency.SaveResponse(ctx, scope, key, body)
-	})
-	return result, replayed, err
+	body, err := json.Marshal(result)
+	if err != nil {
+		return result, false, err
+	}
+	return result, false, repos.Idempotency.SaveResponse(ctx, scope, key, body)
 }
 
-// hashRequest fingerprints the normalized request. Because we hash the parsed
-// struct (not raw bytes), whitespace or key order in the JSON does not matter.
 func hashRequest(request any) (string, error) {
 	b, err := json.Marshal(request)
 	if err != nil {

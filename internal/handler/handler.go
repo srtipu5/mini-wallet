@@ -1,8 +1,4 @@
-// Package handler turns HTTP requests into service calls: parse the request,
-// call the service, write the response. No business rules live here.
-//
-// One file per resource. Routes are registered in internal/routes, request
-// and response shapes live in internal/dto, shared helpers in internal/utils.
+// Package handler parses HTTP requests, calls the service and writes responses.
 package handler
 
 import "github.com/srtipu5/mini-wallet/internal/service"

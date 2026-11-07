@@ -21,9 +21,7 @@ func IdempotencyKey(r *http.Request) (string, error) {
 	return key, nil
 }
 
-// ParseAmount accepts only a plain JSON integer (e.g. 50000).
-// Floats (100.5, 1e3), strings ("100"), null and missing values are rejected,
-// because money is always an integer number of poisha.
+// ParseAmount accepts only a JSON integer (poisha); floats and strings are rejected.
 func ParseAmount(raw json.RawMessage) (int64, error) {
 	s := strings.TrimSpace(string(raw))
 	if s == "" || s == "null" {

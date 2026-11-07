@@ -1,5 +1,4 @@
-// Package routes maps every URL to its handler and applies the middleware
-// chain. It is the only place to look to see the whole API surface.
+// Package routes registers the API routes and middleware.
 package routes
 
 import (
@@ -10,8 +9,6 @@ import (
 	"github.com/srtipu5/mini-wallet/internal/service"
 )
 
-// NewRouter registers every route and wraps them in the middleware chain.
-// Go 1.22+ ServeMux supports methods and {params} in patterns.
 func NewRouter(svc *service.Service) http.Handler {
 	h := handler.New(svc)
 	mux := http.NewServeMux()
@@ -29,9 +26,8 @@ func NewRouter(svc *service.Service) http.Handler {
 	// Transfers
 	mux.HandleFunc("POST /api/v1/transfers", h.Transfer)
 
-	// Anything else gets the standard error envelope instead of a plain-text 404.
 	mux.HandleFunc("/", h.NotFound)
 
-	// Recover is outermost so it also catches panics in the logger.
+	// Recover is outermost so it also catches logger panics.
 	return middleware.Recover(middleware.Logger(mux))
 }

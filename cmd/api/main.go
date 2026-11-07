@@ -26,7 +26,6 @@ func main() {
 func run() error {
 	cfg := config.Load()
 
-	// Stop cleanly on Ctrl+C / `docker compose down`.
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
@@ -41,7 +40,6 @@ func run() error {
 	}
 	slog.Info("migrations applied")
 
-	// Wire the layers: repository (Postgres) -> service (business logic) -> routes/handlers (HTTP).
 	store := postgres.NewStore(pool)
 	svc := service.New(store)
 	router := routes.NewRouter(svc)
@@ -70,7 +68,7 @@ func run() error {
 		slog.Info("shutting down")
 	}
 
-	// Let in-flight requests (and their DB transactions) finish.
+	// Let in-flight requests finish.
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), cfg.ShutdownTimeout)
 	defer cancel()
 	return server.Shutdown(shutdownCtx)

@@ -1,5 +1,4 @@
-// Package domain holds the core entities, error codes and validation rules.
-// It has no dependencies, and every other layer depends on it.
+// Package domain holds the core entities, errors and validation rules.
 package domain
 
 import "time"
@@ -12,8 +11,6 @@ const (
 )
 
 const TransferCompleted = "COMPLETED"
-
-// All JSON field names below are part of the public API.
 
 type Wallet struct {
 	ID        string    `json:"wallet_id"`
@@ -45,8 +42,7 @@ type Transaction struct {
 	CreatedAt            time.Time `json:"created_at"`
 }
 
-// TransactionFilter selects a page of one wallet's history.
-// From is inclusive, To is exclusive: created_at in [From, To).
+// TransactionFilter matches created_at in [From, To).
 type TransactionFilter struct {
 	WalletID string
 	Type     string     // "" = all types

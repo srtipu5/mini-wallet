@@ -12,8 +12,21 @@ import (
 	"github.com/srtipu5/mini-wallet/internal/service"
 )
 
-// These tests call the Postgres repository directly, to check guarantees the
-// API can never reach because the service validates first.
+// These tests call the repositories directly to check database-level
+// guarantees the service's validation normally hides.
+
+// inTx commits if fn succeeds and rolls back otherwise.
+func inTx(ctx context.Context, store service.Store, fn func(r service.Repositories) error) error {
+	tx, err := store.BeginTx(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+	if err := fn(tx.Repos()); err != nil {
+		return err
+	}
+	return tx.Commit(ctx)
+}
 
 func TestRepository_LockBalances(t *testing.T) {
 	resetDB(t)
@@ -22,7 +35,7 @@ func TestRepository_LockBalances(t *testing.T) {
 	addMoney(t, a, 7000)
 	missing := "00000000-0000-0000-0000-000000000000"
 
-	err := postgres.NewStore(db).WithinTx(context.Background(), func(r service.Repositories) error {
+	err := inTx(context.Background(), postgres.NewStore(db), func(r service.Repositories) error {
 		balances, err := r.Wallets.LockBalances(context.Background(), b, missing, a)
 		if err != nil {
 			return err
@@ -54,7 +67,7 @@ func TestRepository_LockBlocksOtherTransactions(t *testing.T) {
 	t.Cleanup(func() { releaseLock(); <-finished })
 	go func() {
 		defer close(finished)
-		firstErr = store.WithinTx(ctx, func(r service.Repositories) error {
+		firstErr = inTx(ctx, store, func(r service.Repositories) error {
 			if _, err := r.Wallets.LockBalances(ctx, a); err != nil {
 				return err
 			}
@@ -71,7 +84,7 @@ func TestRepository_LockBlocksOtherTransactions(t *testing.T) {
 
 	// A second transaction cannot get the lock while the first holds it.
 	waitCtx, cancel := context.WithTimeout(ctx, 300*time.Millisecond)
-	err := store.WithinTx(waitCtx, func(r service.Repositories) error {
+	err := inTx(waitCtx, store, func(r service.Repositories) error {
 		_, err := r.Wallets.LockBalances(waitCtx, a)
 		return err
 	})
@@ -82,7 +95,7 @@ func TestRepository_LockBlocksOtherTransactions(t *testing.T) {
 
 	// Once the first commits, the lock is free again.
 	releaseLock()
-	err = store.WithinTx(ctx, func(r service.Repositories) error {
+	err = inTx(ctx, store, func(r service.Repositories) error {
 		_, err := r.Wallets.LockBalances(ctx, a)
 		return err
 	})
@@ -98,8 +111,8 @@ func TestRepository_BalanceCannotGoNegative(t *testing.T) {
 	a := createWallet(t, "u_a")
 	addMoney(t, a, 1000)
 
-	err := postgres.NewStore(db).WithinTx(context.Background(), func(r service.Repositories) error {
-		_, err := r.Wallets.ChangeBalance(context.Background(), a, -1001)
+	err := inTx(context.Background(), postgres.NewStore(db), func(r service.Repositories) error {
+		_, err := r.Wallets.AdjustBalance(context.Background(), a, -1001)
 		return err
 	})
 	if !errors.Is(err, domain.ErrInsufficientBalance) {

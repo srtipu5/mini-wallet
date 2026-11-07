@@ -16,17 +16,8 @@ type idempotencyRepository struct {
 
 var _ service.IdempotencyRepository = (*idempotencyRepository)(nil)
 
-// Claim tries to reserve (scope, key). It must run inside a transaction.
-//
-//   - Key is new: the row is inserted, and nil is returned. The caller now
-//     owns the key and must do the work in the same transaction.
-//   - Key already committed: the stored record is returned.
-//   - Another transaction holds the key but has not committed yet: the INSERT
-//     waits on the primary-key index until that transaction finishes. If it
-//     commits, we see its row and return it. If it rolls back, our INSERT
-//     succeeds and we become the owner.
-//
-// This is what makes concurrent requests with the same key execute exactly once.
+// Claim must run inside a transaction. If another transaction holds the same
+// key, the INSERT waits for it to commit or roll back.
 func (r *idempotencyRepository) Claim(ctx context.Context, scope, key, requestHash string) (*domain.IdempotencyRecord, error) {
 	tag, err := r.db.Exec(ctx,
 		`INSERT INTO idempotency_keys (scope, key, request_hash) VALUES ($1, $2, $3)
@@ -36,7 +27,7 @@ func (r *idempotencyRepository) Claim(ctx context.Context, scope, key, requestHa
 		return nil, err
 	}
 	if tag.RowsAffected() == 1 {
-		return nil, nil // claimed
+		return nil, nil
 	}
 
 	var rec domain.IdempotencyRecord
@@ -44,13 +35,11 @@ func (r *idempotencyRepository) Claim(ctx context.Context, scope, key, requestHa
 		`SELECT request_hash, response_body FROM idempotency_keys WHERE scope = $1 AND key = $2`,
 		scope, key).Scan(&rec.RequestHash, &rec.ResponseBody)
 	if errors.Is(err, pgx.ErrNoRows) {
-		// Not reachable in practice: a conflicting row exists and rows are never deleted.
-		return nil, errors.New("idempotency key vanished during claim")
+		return nil, errors.New("idempotency key disappeared during claim")
 	}
 	return &rec, err
 }
 
-// SaveResponse stores the success response for a claimed key.
 func (r *idempotencyRepository) SaveResponse(ctx context.Context, scope, key string, body []byte) error {
 	_, err := r.db.Exec(ctx,
 		`UPDATE idempotency_keys SET response_body = $3 WHERE scope = $1 AND key = $2`,

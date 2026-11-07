@@ -15,7 +15,7 @@ type transactionRepository struct {
 
 var _ service.TransactionRepository = (*transactionRepository)(nil)
 
-// Insert writes one ledger entry and fills in its ID and CreatedAt.
+// Insert sets t.ID and t.CreatedAt.
 func (r *transactionRepository) Insert(ctx context.Context, walletID string, t *domain.Transaction) error {
 	err := r.db.QueryRow(ctx,
 		`INSERT INTO transactions (wallet_id, type, amount, balance_after, counterparty_wallet_id, reference_id)
@@ -25,15 +25,14 @@ func (r *transactionRepository) Insert(ctx context.Context, walletID string, t *
 	).Scan(&t.ID, &t.CreatedAt)
 	t.CreatedAt = t.CreatedAt.UTC()
 
-	if pgErrorIs(err, pgUniqueViolation, "transactions_gateway_ref_key") {
+	if isPgError(err, pgUniqueViolation, "transactions_gateway_ref_key") {
 		return domain.ErrDuplicateGatewayRef
 	}
 	return err
 }
 
-// List returns one page (newest first) and the total match count.
 func (r *transactionRepository) List(ctx context.Context, f domain.TransactionFilter) ([]domain.Transaction, int, error) {
-	// NULL parameters switch a condition off, so one query covers every filter combination.
+	// A NULL parameter disables its condition.
 	const where = `
 		WHERE wallet_id = $1
 		  AND ($2::text        IS NULL OR type = $2)
@@ -51,8 +50,7 @@ func (r *transactionRepository) List(ctx context.Context, f domain.TransactionFi
 		return nil, 0, err
 	}
 
-	// Sorting by id (not created_at) gives the exact order in which the
-	// balance changed, because ids are assigned while the wallet is locked.
+	// id order matches the order of balance changes; created_at can tie.
 	rows, err := r.db.Query(ctx,
 		`SELECT id, type, amount, balance_after, counterparty_wallet_id::text, reference_id, created_at
 		 FROM transactions`+where+`

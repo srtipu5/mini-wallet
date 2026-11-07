@@ -2,6 +2,7 @@ package postgres
 
 import (
 	"context"
+	"errors"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -9,7 +10,6 @@ import (
 	"github.com/srtipu5/mini-wallet/internal/service"
 )
 
-// Store implements service.Store on a pgx connection pool.
 type Store struct {
 	pool *pgxpool.Pool
 }
@@ -24,23 +24,35 @@ func (s *Store) Repos() service.Repositories {
 	return newRepositories(s.pool)
 }
 
-// WithinTx runs fn inside one database transaction:
-//
-//	BEGIN
-//	  fn(tx)   -- every repository passed to fn uses this same transaction
-//	COMMIT     -- if fn returns nil
-//	ROLLBACK   -- if fn returns an error (or panics)
-func (s *Store) WithinTx(ctx context.Context, fn func(tx service.Repositories) error) error {
-	return pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
-		return fn(newRepositories(tx))
-	})
+func (s *Store) BeginTx(ctx context.Context) (service.Tx, error) {
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return &dbTx{tx: tx, repos: newRepositories(tx)}, nil
 }
 
 func (s *Store) Ping(ctx context.Context) error {
 	return s.pool.Ping(ctx)
 }
 
-// newRepositories builds every repository on the same connection or transaction.
+type dbTx struct {
+	tx    pgx.Tx
+	repos service.Repositories
+}
+
+func (t *dbTx) Repos() service.Repositories { return t.repos }
+
+func (t *dbTx) Commit(ctx context.Context) error { return t.tx.Commit(ctx) }
+
+// Rollback ignores an already-closed transaction so it is safe to defer.
+func (t *dbTx) Rollback(ctx context.Context) error {
+	if err := t.tx.Rollback(ctx); err != nil && !errors.Is(err, pgx.ErrTxClosed) {
+		return err
+	}
+	return nil
+}
+
 func newRepositories(db DBTX) service.Repositories {
 	return service.Repositories{
 		Wallets:      &walletRepository{db: db},

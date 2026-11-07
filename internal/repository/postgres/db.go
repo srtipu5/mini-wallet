@@ -8,23 +8,20 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 )
 
-// DBTX is satisfied by both *pgxpool.Pool and pgx.Tx, so every repository
-// can run either on the pool or inside a transaction.
+// DBTX is implemented by both *pgxpool.Pool and pgx.Tx.
 type DBTX interface {
 	Exec(ctx context.Context, sql string, args ...any) (pgconn.CommandTag, error)
 	Query(ctx context.Context, sql string, args ...any) (pgx.Rows, error)
 	QueryRow(ctx context.Context, sql string, args ...any) pgx.Row
 }
 
-// Postgres error codes we react to.
 const (
 	pgUniqueViolation = "23505"
 	pgCheckViolation  = "23514"
 )
 
-// pgErrorIs reports whether err is a Postgres error with the given code
-// and (if constraint != "") on the given constraint.
-func pgErrorIs(err error, code, constraint string) bool {
+// isPgError reports whether err has the given code and, if set, constraint.
+func isPgError(err error, code, constraint string) bool {
 	var pgErr *pgconn.PgError
 	if !errors.As(err, &pgErr) {
 		return false

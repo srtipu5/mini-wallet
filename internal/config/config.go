@@ -17,8 +17,7 @@ type Config struct {
 	ShutdownTimeout   time.Duration
 }
 
-// Load reads DATABASE_URL and PORT. Everything has a sensible default, so the
-// API starts against the docker-compose Postgres with no configuration.
+// Load reads DATABASE_URL and PORT; defaults match docker-compose.
 func Load() Config {
 	return Config{
 		DatabaseURL: getenv("DATABASE_URL", "postgres://wallet:wallet@localhost:5432/wallet?sslmode=disable"),
@@ -32,7 +31,6 @@ func Load() Config {
 	}
 }
 
-// getenv returns the environment variable key, or fallback if it is unset or empty.
 func getenv(key, fallback string) string {
 	if v := os.Getenv(key); v != "" {
 		return v

@@ -9,21 +9,23 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/srtipu5/mini-wallet/internal/service"
-
 	"github.com/srtipu5/mini-wallet/internal/routes"
+	"github.com/srtipu5/mini-wallet/internal/service"
 )
 
-// stubStore lets the router run without a database. Its repositories are
-// nil, so any request that wrongly reaches the database panics, and the
-// Recover middleware turns that into a 500 the tests would catch.
+// stubStore has nil repositories, so a request that wrongly reaches the
+// database panics and shows up as a 500.
 type stubStore struct{ pingErr error }
 
-func (s stubStore) Repos() service.Repositories { return service.Repositories{} }
-func (s stubStore) WithinTx(_ context.Context, fn func(service.Repositories) error) error {
-	return fn(service.Repositories{})
-}
-func (s stubStore) Ping(context.Context) error { return s.pingErr }
+func (s stubStore) Repos() service.Repositories                 { return service.Repositories{} }
+func (s stubStore) BeginTx(context.Context) (service.Tx, error) { return stubTx{}, nil }
+func (s stubStore) Ping(context.Context) error                  { return s.pingErr }
+
+type stubTx struct{}
+
+func (stubTx) Repos() service.Repositories    { return service.Repositories{} }
+func (stubTx) Commit(context.Context) error   { return nil }
+func (stubTx) Rollback(context.Context) error { return nil }
 
 func serve(t *testing.T, store service.Store, method, path, body string, headers map[string]string) *httptest.ResponseRecorder {
 	t.Helper()

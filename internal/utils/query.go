@@ -25,11 +25,8 @@ func QueryInt(q url.Values, name string, def, min, max int) (int, error) {
 	return n, nil
 }
 
-// QueryTime reads an optional ISO-8601 date (2026-11-05) or date-time
-// (2026-11-05T10:00:00Z) query parameter.
-//
-// Ranges are half-open [from, to). For a date-only upper bound we move to the
-// start of the NEXT day, so "to=2026-11-05" includes the whole of Nov 5.
+// QueryTime parses a date or RFC 3339 date-time. A date-only upper bound moves
+// to the next day so the whole day is included.
 func QueryTime(q url.Values, name string, isUpperBound bool) (*time.Time, error) {
 	raw := strings.TrimSpace(q.Get(name))
 	if raw == "" {
@@ -48,8 +45,7 @@ func QueryTime(q url.Values, name string, isUpperBound bool) (*time.Time, error)
 	return nil, domain.Validation("The " + name + " parameter must be an ISO-8601 date (2026-11-05) or date-time (2026-11-05T10:00:00Z)")
 }
 
-// QueryPage reads the optional page and page_size query parameters used by
-// every list endpoint: page >= 1 (default 1), page_size 1-100 (default 20).
+// QueryPage reads page (default 1) and page_size (default 20, max 100).
 func QueryPage(q url.Values) (page, pageSize int, err error) {
 	if page, err = QueryInt(q, "page", 1, 1, domain.MaxPage); err != nil {
 		return 0, 0, err

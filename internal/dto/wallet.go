@@ -1,11 +1,4 @@
-// Package dto holds the data shapes that cross layer boundaries, one file per
-// resource:
-//
-//   - *Request: HTTP request bodies, decoded by the handlers.
-//   - *Input:   use-case inputs, passed from the handlers to the service.
-//   - outputs:  use-case results that are not domain entities (e.g. HistoryPage).
-//
-// It depends only on the domain package.
+// Package dto holds request bodies, service inputs and response shapes.
 package dto
 
 import (
@@ -22,25 +15,20 @@ type CreateWalletRequest struct {
 }
 
 // AddMoneyRequest is the body of POST /api/v1/wallets/{wallet_id}/add-money.
-// Amount is raw JSON so the handler can reject floats, exponents and strings
-// (money is integer poisha only).
+// Amount stays raw so non-integer values can be rejected.
 type AddMoneyRequest struct {
 	Amount     json.RawMessage `json:"amount"`
 	GatewayRef string          `json:"gateway_ref"`
 }
 
-// AddMoneyInput is the add-money use-case input.
-//
-// The JSON tags matter: the input is hashed to detect an Idempotency-Key
-// reused with a different request. Changing them changes every hash.
+// AddMoneyInput is hashed for idempotency checks; keep JSON tags stable.
 type AddMoneyInput struct {
 	WalletID   string `json:"wallet_id"`
 	Amount     int64  `json:"amount"`
 	GatewayRef string `json:"gateway_ref"`
 }
 
-// AddMoneyResult is the response of a successful add-money call.
-// Keep the JSON tags stable: stored idempotent responses are decoded into it.
+// AddMoneyResult is stored for idempotent replays; keep JSON tags stable.
 type AddMoneyResult struct {
 	TransactionID int64     `json:"transaction_id"`
 	WalletID      string    `json:"wallet_id"`

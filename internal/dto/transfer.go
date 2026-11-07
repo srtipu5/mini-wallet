@@ -3,7 +3,7 @@ package dto
 import "encoding/json"
 
 // TransferRequest is the body of POST /api/v1/transfers.
-// Amount is raw JSON so the handler can reject floats, exponents and strings.
+// Amount stays raw so non-integer values can be rejected.
 type TransferRequest struct {
 	FromWalletID string          `json:"from_wallet_id"`
 	ToWalletID   string          `json:"to_wallet_id"`
@@ -11,10 +11,7 @@ type TransferRequest struct {
 	Note         *string         `json:"note"`
 }
 
-// TransferInput is the transfer use-case input.
-//
-// The JSON tags matter: the input is hashed to detect an Idempotency-Key
-// reused with a different request. Changing them changes every hash.
+// TransferInput is hashed for idempotency checks; keep JSON tags stable.
 type TransferInput struct {
 	FromWalletID string  `json:"from_wallet_id"`
 	ToWalletID   string  `json:"to_wallet_id"`

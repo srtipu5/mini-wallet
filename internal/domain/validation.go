@@ -38,8 +38,6 @@ var phonePattern = regexp.MustCompile(`^01[3-9][0-9]{8}$`)
 // uuidPattern matches the canonical 8-4-4-4-12 hex format.
 var uuidPattern = regexp.MustCompile(`^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$`)
 
-// ValidateAmount checks the per-transaction limits. Both cases use the
-// INVALID_AMOUNT code; the message says which limit was broken.
 func ValidateAmount(amount int64) error {
 	if amount < MinAmount {
 		return NewError(CodeInvalidAmount,
@@ -70,6 +68,5 @@ func ValidateText(field, value string, maxLen int) error {
 	return nil
 }
 
-// IsValidWalletID reports whether id is a well-formed wallet id.
-// A malformed id can never match a wallet, so callers treat it as "not found".
+// IsValidWalletID reports whether id is a UUID; callers treat a malformed id as not found.
 func IsValidWalletID(id string) bool { return uuidPattern.MatchString(id) }

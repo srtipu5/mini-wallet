@@ -1,8 +1,4 @@
-// Package postgres is the PostgreSQL implementation of the repository
-// interfaces in internal/service/repository.go. All SQL lives here, together
-// with the connection and migration code.
-//
-// Another database would get its own sibling package (e.g. ../mongodb).
+// Package postgres implements the service repositories on PostgreSQL.
 package postgres
 
 import (
@@ -21,8 +17,7 @@ import (
 	"github.com/srtipu5/mini-wallet/migrations"
 )
 
-// Connect opens a pool and waits (up to ~30s) until the database answers.
-// The wait makes `docker compose up` robust if Postgres starts slowly.
+// Connect opens a pool and retries for ~30s while the database starts up.
 func Connect(ctx context.Context, databaseURL string) (*pgxpool.Pool, error) {
 	pool, err := pgxpool.New(ctx, databaseURL)
 	if err != nil {
@@ -45,9 +40,7 @@ func Connect(ctx context.Context, databaseURL string) (*pgxpool.Pool, error) {
 	}
 }
 
-// Migrate applies all pending migrations from the embedded SQL files.
-// golang-migrate takes a Postgres advisory lock, so running several
-// instances at once is safe.
+// Migrate applies pending embedded migrations.
 func Migrate(databaseURL string) error {
 	source, err := iofs.New(migrations.FS, ".")
 	if err != nil {
@@ -66,7 +59,7 @@ func Migrate(databaseURL string) error {
 	return nil
 }
 
-// toMigrateURL swaps the scheme to the one golang-migrate's pgx v5 driver expects.
+// toMigrateURL converts the URL to the pgx5:// scheme golang-migrate expects.
 func toMigrateURL(databaseURL string) string {
 	for _, prefix := range []string{"postgresql://", "postgres://"} {
 		if strings.HasPrefix(databaseURL, prefix) {

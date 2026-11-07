@@ -11,9 +11,8 @@ import (
 	"github.com/srtipu5/mini-wallet/internal/service"
 )
 
-// fakeStore is an in-memory implementation of the service.Store interface, so the business
-// logic can be tested without Postgres. WithinTx snapshots the state and
-// restores it if fn fails, which mimics a database rollback.
+// fakeStore is an in-memory service.Store. A transaction snapshots the state
+// on BeginTx and restores it on Rollback unless it was committed.
 type fakeStore struct {
 	wallets   map[string]domain.Wallet
 	ledger    []ledgerRow
@@ -23,7 +22,7 @@ type fakeStore struct {
 	nextWallet, nextTx, nextTransfer int
 
 	// Instrumentation for assertions.
-	txBegun    int        // number of WithinTx calls
+	txBegun    int        // number of BeginTx calls
 	lockCalls  [][]string // ids passed to each LockBalances call
 	walletGets int        // number of Wallets.Get calls
 
@@ -61,35 +60,51 @@ func (f *fakeStore) Repos() service.Repositories {
 	}
 }
 
-func (f *fakeStore) WithinTx(_ context.Context, fn func(r service.Repositories) error) error {
+func (f *fakeStore) BeginTx(context.Context) (service.Tx, error) {
 	f.txBegun++
-	snapshot := f.snapshot()
-	if err := fn(f.Repos()); err != nil {
-		f.restore(snapshot)
-		return err
-	}
-	return nil
+	return &fakeTx{f: f, snapshot: f.snapshot()}, nil
 }
 
 func (f *fakeStore) Ping(context.Context) error { return f.pingErr }
 
+type fakeTx struct {
+	f        *fakeStore
+	snapshot fakeState
+	done     bool // committed or rolled back
+}
+
+func (t *fakeTx) Repos() service.Repositories { return t.f.Repos() }
+
+func (t *fakeTx) Commit(context.Context) error {
+	t.done = true
+	return nil
+}
+
+func (t *fakeTx) Rollback(context.Context) error {
+	if !t.done {
+		t.f.restore(t.snapshot)
+		t.done = true
+	}
+	return nil
+}
+
 type fakeState struct {
-	wallets   map[string]domain.Wallet
-	ledger    []ledgerRow
-	transfers []domain.Transfer
-	idem      map[string]domain.IdempotencyRecord
-	nextTx    int
-	nextTrf   int
+	wallets      map[string]domain.Wallet
+	ledger       []ledgerRow
+	transfers    []domain.Transfer
+	idem         map[string]domain.IdempotencyRecord
+	nextTx       int
+	nextTransfer int
 }
 
 func (f *fakeStore) snapshot() fakeState {
 	s := fakeState{
-		wallets:   map[string]domain.Wallet{},
-		ledger:    append([]ledgerRow(nil), f.ledger...),
-		transfers: append([]domain.Transfer(nil), f.transfers...),
-		idem:      map[string]domain.IdempotencyRecord{},
-		nextTx:    f.nextTx,
-		nextTrf:   f.nextTransfer,
+		wallets:      map[string]domain.Wallet{},
+		ledger:       append([]ledgerRow(nil), f.ledger...),
+		transfers:    append([]domain.Transfer(nil), f.transfers...),
+		idem:         map[string]domain.IdempotencyRecord{},
+		nextTx:       f.nextTx,
+		nextTransfer: f.nextTransfer,
 	}
 	for k, v := range f.wallets {
 		s.wallets[k] = v
@@ -102,7 +117,7 @@ func (f *fakeStore) snapshot() fakeState {
 
 func (f *fakeStore) restore(s fakeState) {
 	f.wallets, f.ledger, f.transfers, f.idem = s.wallets, s.ledger, s.transfers, s.idem
-	f.nextTx, f.nextTransfer = s.nextTx, s.nextTrf
+	f.nextTx, f.nextTransfer = s.nextTx, s.nextTransfer
 }
 
 // entriesOf returns a wallet's ledger entries, oldest first.
@@ -180,7 +195,7 @@ func (r fakeWallets) LockBalances(_ context.Context, ids ...string) (map[string]
 	return balances, nil
 }
 
-func (r fakeWallets) ChangeBalance(_ context.Context, id string, delta int64) (int64, error) {
+func (r fakeWallets) AdjustBalance(_ context.Context, id string, delta int64) (int64, error) {
 	if (delta < 0 && r.f.failAt == "debit") || (delta > 0 && r.f.failAt == "credit") {
 		return 0, errInjected
 	}

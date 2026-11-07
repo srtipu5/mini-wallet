@@ -7,10 +7,8 @@ import (
 	"github.com/srtipu5/mini-wallet/internal/dto"
 )
 
-// ListTransactions returns a page of a wallet's history, newest first.
-// The filter has already been validated by the HTTP layer.
 func (s *Service) ListTransactions(ctx context.Context, f domain.TransactionFilter) (dto.HistoryPage, error) {
-	// 404 for an unknown wallet, instead of an empty list.
+	// Return 404 for an unknown wallet rather than an empty list.
 	wallet, err := s.GetWallet(ctx, f.WalletID)
 	if err != nil {
 		return dto.HistoryPage{}, err
@@ -22,7 +20,7 @@ func (s *Service) ListTransactions(ctx context.Context, f domain.TransactionFilt
 		return dto.HistoryPage{}, err
 	}
 	if items == nil {
-		items = []domain.Transaction{} // render [] instead of null
+		items = []domain.Transaction{}
 	}
 
 	return dto.HistoryPage{

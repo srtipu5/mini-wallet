@@ -1,5 +1,4 @@
-// Package migrations embeds the SQL migration files into the binary,
-// so the service can migrate the database on startup without extra files.
+// Package migrations embeds the SQL migrations into the binary.
 package migrations
 
 import "embed"

@@ -1,6 +1,4 @@
-// Package utils holds small, reusable helpers for the HTTP layer: JSON request
-// decoding, response/error writing and query-parameter parsing. It contains no
-// business rules.
+// Package utils holds HTTP helpers for decoding requests and writing responses.
 package utils
 
 import (
@@ -46,8 +44,7 @@ func SendData(w http.ResponseWriter, status int, v any) {
 	}
 }
 
-// SendError renders any error in the standard envelope.
-// Unknown (non-business) errors become a generic 500 so internals never leak.
+// SendError writes the error envelope; non-domain errors become a generic 500.
 func SendError(w http.ResponseWriter, r *http.Request, err error) {
 	if e, ok := domain.AsError(err); ok {
 		status, known := statusByCode[e.Code]
@@ -68,8 +65,7 @@ func SendInternalError(w http.ResponseWriter) {
 		ErrorBody{ErrorDetail{domain.CodeInternal, "Internal server error."}})
 }
 
-// SendIdempotent writes a 201 for an idempotent operation and marks replays
-// with a header, so clients (and tests) can tell a replay from a fresh execution.
+// SendIdempotent writes 201 and sets Idempotent-Replayed on replays.
 func SendIdempotent(w http.ResponseWriter, replayed bool, v any) {
 	if replayed {
 		w.Header().Set("Idempotent-Replayed", "true")
@@ -77,9 +73,7 @@ func SendIdempotent(w http.ResponseWriter, replayed bool, v any) {
 	SendData(w, http.StatusCreated, v)
 }
 
-// formatMessage gives every error message sent to clients the same style:
-// a sentence that starts with a capital letter and ends with a full stop,
-// e.g. "Wallet does not have enough balance for this transfer."
+// formatMessage capitalizes the message and ends it with a full stop.
 func formatMessage(s string) string {
 	s = strings.TrimSpace(s)
 	r, size := utf8.DecodeRuneInString(s)
