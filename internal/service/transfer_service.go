@@ -24,13 +24,20 @@ func (s *Service) Transfer(ctx context.Context, idempotencyKey string, in dto.Tr
 		return domain.Transfer{}, false, err
 	}
 	defer tx.Rollback(ctx)
+	repos := tx.Repos()
 
-	transfer, replayed, err := withIdempotency(ctx, tx.Repos(), scopeTransfer, idempotencyKey, in,
-		func() (domain.Transfer, error) {
-			return executeTransfer(ctx, tx.Repos(), in)
-		})
+	transfer, replayed, err := claimIdempotency[domain.Transfer](ctx, repos, scopeTransfer, idempotencyKey, in)
 	if err != nil {
 		return domain.Transfer{}, false, err
+	}
+	if !replayed {
+		transfer, err = executeTransfer(ctx, repos, in)
+		if err != nil {
+			return domain.Transfer{}, false, err
+		}
+		if err := saveIdempotencyResponse(ctx, repos, scopeTransfer, idempotencyKey, transfer); err != nil {
+			return domain.Transfer{}, false, err
+		}
 	}
 
 	if err := tx.Commit(ctx); err != nil {

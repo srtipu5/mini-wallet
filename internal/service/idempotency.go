@@ -9,52 +9,60 @@ import (
 	"github.com/srtipu5/mini-wallet/internal/domain"
 )
 
+// Idempotency flow, all inside one DB transaction:
+//
+//  1. claimIdempotency        – reserve the key, or return the saved response on a retry
+//  2. do the work             – only when it is not a retry
+//  3. saveIdempotencyResponse – store the response for future retries
+//
+// If anything fails, the transaction rolls back and the key is released too.
+
 const (
 	scopeAddMoney = "add_money"
 	scopeTransfer = "transfer"
 )
 
-// withIdempotency runs fn at most once per (scope, key) and replays the saved
-// response on retries. It must run inside the caller's transaction so the key
-// and the work commit or roll back together.
-func withIdempotency[T any](
-	ctx context.Context,
-	repos Repositories,
-	scope, key string,
-	request any,
-	fn func() (T, error),
-) (result T, replayed bool, err error) {
-	hash, err := hashRequest(request)
+// claimIdempotency reserves the key for this request.
+// It returns replayed=true with the saved response if the same request
+// already used this key, and ErrIdempotencyKeyReused if a different one did.
+func claimIdempotency[T any](ctx context.Context, repos Repositories, scope, key string, request any) (T, bool, error) {
+	var saved T
+
+	requestHash, err := hashRequest(request)
 	if err != nil {
-		return result, false, err
+		return saved, false, err
 	}
 
-	// Blocks while another in-flight request holds the same key.
-	existing, err := repos.Idempotency.Claim(ctx, scope, key, hash)
+	// Waits if another request with the same key is still running.
+	previousRequest, err := repos.Idempotency.Claim(ctx, scope, key, requestHash)
 	if err != nil {
-		return result, false, err
-	}
-	if existing != nil {
-		if existing.RequestHash != hash {
-			return result, false, domain.ErrIdempotencyKeyReused
-		}
-		if err := json.Unmarshal(existing.ResponseBody, &result); err != nil {
-			return result, false, err
-		}
-		return result, true, nil
+		return saved, false, err
 	}
 
-	if result, err = fn(); err != nil {
-		return result, false, err
+	switch {
+	case previousRequest == nil: // new key
+		return saved, false, nil
+	case previousRequest.RequestHash != requestHash: // same key, different request
+		return saved, false, domain.ErrIdempotencyKeyReused
 	}
 
-	body, err := json.Marshal(result)
-	if err != nil {
-		return result, false, err
+	// Retry of the same request: replay the saved response.
+	if err := json.Unmarshal(previousRequest.ResponseBody, &saved); err != nil {
+		return saved, false, err
 	}
-	return result, false, repos.Idempotency.SaveResponse(ctx, scope, key, body)
+	return saved, true, nil
 }
 
+// saveIdempotencyResponse stores the response so retries can replay it.
+func saveIdempotencyResponse(ctx context.Context, repos Repositories, scope, key string, response any) error {
+	body, err := json.Marshal(response)
+	if err != nil {
+		return err
+	}
+	return repos.Idempotency.SaveResponse(ctx, scope, key, body)
+}
+
+// hashRequest fingerprints the request body so a reused key can be detected.
 func hashRequest(request any) (string, error) {
 	b, err := json.Marshal(request)
 	if err != nil {

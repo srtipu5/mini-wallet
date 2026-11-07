@@ -27,13 +27,20 @@ func (s *Service) AddMoney(ctx context.Context, idempotencyKey string, in dto.Ad
 		return dto.AddMoneyResult{}, false, err
 	}
 	defer tx.Rollback(ctx)
+	repos := tx.Repos()
 
-	result, replayed, err := withIdempotency(ctx, tx.Repos(), scopeAddMoney, idempotencyKey, in,
-		func() (dto.AddMoneyResult, error) {
-			return creditWallet(ctx, tx.Repos(), in)
-		})
+	result, replayed, err := claimIdempotency[dto.AddMoneyResult](ctx, repos, scopeAddMoney, idempotencyKey, in)
 	if err != nil {
 		return dto.AddMoneyResult{}, false, err
+	}
+	if !replayed {
+		result, err = creditWallet(ctx, repos, in)
+		if err != nil {
+			return dto.AddMoneyResult{}, false, err
+		}
+		if err := saveIdempotencyResponse(ctx, repos, scopeAddMoney, idempotencyKey, result); err != nil {
+			return dto.AddMoneyResult{}, false, err
+		}
 	}
 
 	if err := tx.Commit(ctx); err != nil {

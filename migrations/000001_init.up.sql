@@ -37,6 +37,9 @@ CREATE TABLE transfers (
 --   TRANSFER_IN  -> reference_id = transfer id, counterparty = sender
 -- id is a BIGSERIAL: it is assigned while the wallet row is locked, so for a
 -- given wallet a higher id is always a later balance change. We sort on it.
+-- created_at uses clock_timestamp() (the time the row is written) instead of
+-- now() (the time the DB transaction started), so timestamps follow the same
+-- order as id even when concurrent transfers wait on the wallet lock.
 CREATE TABLE transactions (
     id                      BIGSERIAL   PRIMARY KEY,
     wallet_id               UUID        NOT NULL REFERENCES wallets(id),
@@ -45,7 +48,7 @@ CREATE TABLE transactions (
     balance_after           BIGINT      NOT NULL CHECK (balance_after >= 0),
     counterparty_wallet_id  UUID        REFERENCES wallets(id),
     reference_id            TEXT        NOT NULL,
-    created_at              TIMESTAMPTZ NOT NULL DEFAULT now()
+    created_at              TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp()
 );
 
 CREATE INDEX transactions_wallet_history_idx ON transactions (wallet_id, id DESC);
